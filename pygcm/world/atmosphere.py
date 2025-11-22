@@ -116,7 +116,7 @@ class Atmosphere:
                 )
                 # Allow explicit override via engine_kwargs if provided.
                 ekw.setdefault("params", demo_params)
-            self.engine = make_engine(engine_kind, **ekw)  # type: ignore[assignment]
+            self.engine = make_engine(engine_kind, **ekw)
 
         self.coupler: AtmosCoupler = coupler or make_coupler(coupler_kind, **(coupler_kwargs or {}))
 
