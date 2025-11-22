@@ -1,0 +1,6 @@
+numpy
+matplotlib
+scipy
+netCDF4
+jax
+jaxlib
