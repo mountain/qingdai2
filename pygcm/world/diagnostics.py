@@ -18,13 +18,13 @@ Notes
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
 try:
     # Optional: if JAX backend is enabled, xp becomes jax.numpy; otherwise numpy
-    from pygcm.jax_compat import xp  # type: ignore
+    from pygcm.jax_compat import xp
 except Exception:
     xp = np  # Fallback to numpy
 
@@ -40,7 +40,7 @@ def _as_array(x: Any):
     return x
 
 
-def area_weights(grid, normalize: bool = False, mask: Optional[np.ndarray] = None) -> np.ndarray:
+def area_weights(grid, normalize: bool = False, mask: np.ndarray | None = None) -> np.ndarray:
     """
     Return cos(phi) area weights (shape [lat,lon]).
     If normalize=True, divide by the global sum (masked if provided).
@@ -128,7 +128,7 @@ class Invariants:
     pe: float
 
 
-def invariants_from_read(state, grid, mask: Optional[np.ndarray] = None) -> Invariants:
+def invariants_from_read(state, grid, mask: np.ndarray | None = None) -> Invariants:
     """
     Compute invariants on READ buffers (current/old state).
     """
@@ -147,7 +147,7 @@ def invariants_from_read(state, grid, mask: Optional[np.ndarray] = None) -> Inva
     return Invariants(mass=m, px=px, aam=aam, ke=ke, pe=pe)
 
 
-def invariants_from_write(state, grid, mask: Optional[np.ndarray] = None) -> Invariants:
+def invariants_from_write(state, grid, mask: np.ndarray | None = None) -> Invariants:
     """
     Compute invariants on WRITE buffers (next state before swap).
     """
@@ -167,7 +167,7 @@ def invariants_from_write(state, grid, mask: Optional[np.ndarray] = None) -> Inv
     return Invariants(mass=m, px=px, aam=aam, ke=ke, pe=pe)
 
 
-def step_deltas(prev: Invariants, nxt: Invariants) -> Dict[str, float]:
+def step_deltas(prev: Invariants, nxt: Invariants) -> dict[str, float]:
     """
     Return simple deltas (next - prev) for quick checks.
     """
@@ -180,7 +180,7 @@ def step_deltas(prev: Invariants, nxt: Invariants) -> Dict[str, float]:
     }
 
 
-def diagnostics_report(prev: Invariants, nxt: Invariants) -> Dict[str, float]:
+def diagnostics_report(prev: Invariants, nxt: Invariants) -> dict[str, float]:
     """
     Convenience helper returning both absolute values and deltas in one dict.
     """

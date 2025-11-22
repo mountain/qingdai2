@@ -63,6 +63,13 @@ if _JAX_ENABLED:
         _JAX_BACKEND = "none"
 
 
+# Public array module: jax.numpy if enabled on accelerator, else numpy.
+if _JAX_ENABLED and (_JNP is not None):
+    xp = _JNP
+else:
+    xp = _np
+
+
 def is_enabled() -> bool:
     return _JAX_ENABLED
 

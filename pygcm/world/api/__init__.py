@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 World API (OO + DBA friendly): unified interfaces for layers and couplers.
 
@@ -28,15 +29,14 @@ Notes
 This API is an evolution/abstraction of P020 OO refactor, intended as the orchestrator contract.
 """
 
-from typing import Protocol, Optional, Tuple, Dict, Any
+from typing import Any, Protocol
+
 import numpy as np
 
 # Reuse existing ports (extend as needed)
 from ..ports import (
-    SurfaceToAtmosphere,
-    AtmosphereToSurfaceFluxes,
     ColumnProcessIn,
-    ColumnProcessOut,
+    SurfaceToAtmosphere,
 )
 
 # --------------------------------------------------------------------
@@ -56,7 +56,7 @@ class AtmosEngine(Protocol):
         h: np.ndarray,
         dt: float,
         **kwargs: Any,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         ...
 
 
@@ -74,7 +74,7 @@ class OceanEngine(Protocol):
         sst: np.ndarray,
         dt: float,
         **kwargs: Any,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         ...
 
 
@@ -87,10 +87,10 @@ class LandEngine(Protocol):
     """
     def step(
         self,
-        inputs: Dict[str, np.ndarray],
+        inputs: dict[str, np.ndarray],
         dt: float,
         **kwargs: Any,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -101,10 +101,10 @@ class EcologyEngine(Protocol):
     """
     def step(
         self,
-        state: Dict[str, np.ndarray],
+        state: dict[str, np.ndarray],
         dt: float,
         **kwargs: Any,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -120,11 +120,11 @@ class RadiationCoupler(Protocol):
     def compute(
         self,
         surface: SurfaceToAtmosphere,
-        column: Optional[ColumnProcessIn],
-        grid: Optional[Any],
+        column: ColumnProcessIn | None,
+        grid: Any | None,
         state: Any,
         dt: float,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -137,10 +137,10 @@ class HumidityCoupler(Protocol):
         self,
         surface: SurfaceToAtmosphere,
         column: ColumnProcessIn,
-        grid: Optional[Any],
+        grid: Any | None,
         state: Any,
         dt: float,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -152,10 +152,10 @@ class CloudCoupler(Protocol):
     def compute(
         self,
         column: ColumnProcessIn,
-        dynamics_fields: Dict[str, np.ndarray],
-        grid: Optional[Any],
+        dynamics_fields: dict[str, np.ndarray],
+        grid: Any | None,
         dt: float,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -168,11 +168,11 @@ class WindStressCoupler(Protocol):
         self,
         u10: np.ndarray,
         v10: np.ndarray,
-        uo: Optional[np.ndarray],
-        vo: Optional[np.ndarray],
-        grid: Optional[Any],
+        uo: np.ndarray | None,
+        vo: np.ndarray | None,
+        grid: Any | None,
         dt: float,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -184,11 +184,11 @@ class OceanSurfaceCoupler(Protocol):
     def compute(
         this,
         Qnet: np.ndarray,
-        ice_mask: Optional[np.ndarray],
-        params: Dict[str, Any],
-        grid: Optional[Any],
+        ice_mask: np.ndarray | None,
+        params: dict[str, Any],
+        grid: Any | None,
         dt: float,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -200,10 +200,10 @@ class RoutingCoupler(Protocol):
     def compute(
         self,
         runoff_flux: np.ndarray,
-        grid: Optional[Any],
+        grid: Any | None,
         dt: float,
         **network: Any,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         ...
 
 
@@ -213,10 +213,10 @@ class RoutingCoupler(Protocol):
 
 def make_atmos_engine(kind: str, **kwargs: Any) -> AtmosEngine:
     if kind == "legacy_spectral":
-        from ..atmosphere_backend import LegacySpectralBackend
-        return LegacySpectralBackend(**kwargs)  # type: ignore[return-value]
+        from ..atmosphere_backend import LegacySpectralBackend  # noqa: E402
+        return LegacySpectralBackend(**kwargs)
     if kind == "demo_relax":
-        from ..atmos_kernels import DemoRelaxEngine
+        from ..atmos_kernels import DemoRelaxEngine  # noqa: E402
         return DemoRelaxEngine(**kwargs)
     raise ValueError(f"Unknown AtmosEngine kind: {kind!r}")
 
@@ -234,9 +234,11 @@ def make_coupler(kind: str, **kwargs: Any) -> Any:
     if kind == "ocean_surface":
         raise NotImplementedError("ocean_surface coupler not wired; supply implementation")
     if kind == "routing":
-        from ..routing import RiverRouting  # example: not a perfect coupler fit, but close
-        return RiverRouting(**kwargs)  # type: ignore[return-value]
+        from ..routing import (
+            RiverRouting,  # noqa: E402  # example: not a perfect coupler fit, but close
+        )
+        return RiverRouting(**kwargs)
     if kind == "default":
-        from ..coupler import Coupler, CouplerParams
-        return Coupler(kwargs.get("params") or CouplerParams())  # type: ignore[return-value]
+        from ..coupler import Coupler, CouplerParams  # noqa: E402
+        return Coupler(kwargs.get("params") or CouplerParams())
     raise ValueError(f"Unknown coupler kind: {kind!r}")

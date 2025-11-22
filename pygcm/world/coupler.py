@@ -27,7 +27,7 @@ Notes
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Any
+from typing import Any
 
 import numpy as np
 
@@ -37,11 +37,12 @@ except Exception:
     xp = np
 
 from pygcm import constants
+
 from .ports import (
-    SurfaceToAtmosphere,
     AtmosphereToSurfaceFluxes,
     ColumnProcessIn,
     ColumnProcessOut,
+    SurfaceToAtmosphere,
 )
 
 
@@ -59,7 +60,7 @@ class CouplerParams:
 
 
 class Coupler:
-    def __init__(self, params: Optional[CouplerParams] = None) -> None:
+    def __init__(self, params: CouplerParams | None = None) -> None:
         self.params = params or CouplerParams()
 
         # Try import optional modules
@@ -67,13 +68,13 @@ class Coupler:
         self._humidity = None
         if self.params.use_energy_module:
             try:
-                from pygcm import energy as _energy  # type: ignore
+                from pygcm import energy as _energy
                 self._energy = _energy
             except Exception:
                 self._energy = None
         if self.params.use_humidity_module:
             try:
-                from pygcm import humidity as _humidity  # type: ignore
+                from pygcm import humidity as _humidity
                 self._humidity = _humidity
             except Exception:
                 self._humidity = None
@@ -82,11 +83,11 @@ class Coupler:
         self.LV = float(getattr(constants, "LV", 2.5e6))
 
     def compute(self,
-                surface_in: Optional[SurfaceToAtmosphere],
-                column_in: Optional[ColumnProcessIn],
-                grid: Optional[Any],
+                surface_in: SurfaceToAtmosphere | None,
+                column_in: ColumnProcessIn | None,
+                grid: Any | None,
                 state: Any,
-                dt: float) -> Tuple[Optional[AtmosphereToSurfaceFluxes], Optional[ColumnProcessOut]]:
+                dt: float) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
         """
         Compute interface fluxes (atmosphere -> surface) and in-column updates.
 
@@ -107,7 +108,6 @@ class Coupler:
             return None, self._column_only(column_in)
 
         T_s = surface_in.T_s
-        shp = T_s.shape
 
         # Initialize placeholders
         SH = xp.zeros_like(T_s)
@@ -198,7 +198,7 @@ class Coupler:
             return xp.zeros_like(ref)
         return xp.full_like(ref, float(self.params.evap_fallback_kg_m2_s))
 
-    def _column_only(self, column_in: Optional[ColumnProcessIn]) -> Optional[ColumnProcessOut]:
+    def _column_only(self, column_in: ColumnProcessIn | None) -> ColumnProcessOut | None:
         if column_in is None:
             return None
         q_next = xp.array(column_in.q, copy=True)

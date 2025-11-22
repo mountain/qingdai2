@@ -1,7 +1,6 @@
 import numpy as np
-
+from pygcm.world.atmosphere import AtmosParams, Atmosphere
 from pygcm.world.state import zeros_world_state
-from pygcm.world.atmosphere import Atmosphere, AtmosParams
 
 
 def test_atmosphere_time_step_writes_only_write_buffers_and_requires_swap():

@@ -1,13 +1,11 @@
 import numpy as np
-import pytest
-
+from pygcm.numerics.double_buffer import DoubleBufferingArray as DBA
 from pygcm.world.state import (
+    WorldState,
+    dba_from_array,
     zeros_world_state,
     zeros_world_state_from_grid,
-    dba_from_array,
-    WorldState,
 )
-from pygcm.numerics.double_buffer import DoubleBufferingArray as DBA
 
 
 def test_zeros_world_state_allocates_dbas():

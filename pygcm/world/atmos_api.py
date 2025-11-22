@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Atmosphere API: unified interfaces for engines and couplers (OO + DBA friendly).
 
@@ -20,10 +21,11 @@ Notes
   must expose array → array step().
 """
 
-from typing import Optional, Tuple, Protocol, Any
-import numpy as np
-from .ports import SurfaceToAtmosphere, AtmosphereToSurfaceFluxes, ColumnProcessIn, ColumnProcessOut
+from typing import Any, Protocol
 
+import numpy as np
+
+from .ports import AtmosphereToSurfaceFluxes, ColumnProcessIn, ColumnProcessOut, SurfaceToAtmosphere
 
 # --------------------------
 # Engines (1-layer)
@@ -41,7 +43,7 @@ class AtmosEngine(Protocol):
         h: np.ndarray,
         dt: float,
         **kwargs: Any,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         ...
 
 
@@ -56,12 +58,12 @@ class AtmosCoupler(Protocol):
     """
     def compute(
         self,
-        surface_in: Optional[SurfaceToAtmosphere],
-        column_in: Optional[ColumnProcessIn],
-        grid: Optional[Any],
+        surface_in: SurfaceToAtmosphere | None,
+        column_in: ColumnProcessIn | None,
+        grid: Any | None,
         state: Any,
         dt: float,
-    ) -> Tuple[Optional[AtmosphereToSurfaceFluxes], Optional[ColumnProcessOut]]:
+    ) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
         ...
 
 
@@ -78,7 +80,7 @@ def make_engine(kind: str, **kwargs: Any) -> AtmosEngine:
     """
     if kind == "legacy_spectral":
         from .atmosphere_backend import LegacySpectralBackend
-        return LegacySpectralBackend(**kwargs)  # type: ignore[return-value]
+        return LegacySpectralBackend(**kwargs)
     if kind == "demo_relax":
         from .atmos_kernels import DemoRelaxEngine
         return DemoRelaxEngine(**kwargs)
@@ -94,5 +96,5 @@ def make_coupler(kind: str = "default", **kwargs: Any) -> AtmosCoupler:
     if kind == "default":
         from .coupler import Coupler, CouplerParams
         params = kwargs.get("params") or CouplerParams()
-        return Coupler(params)  # type: ignore[return-value]
+        return Coupler(params)
     raise ValueError(f"Unknown AtmosCoupler kind: {kind!r}")

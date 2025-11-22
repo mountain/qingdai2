@@ -37,7 +37,6 @@ s2.swap_all()
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 import numpy as np
 
@@ -47,7 +46,6 @@ except Exception:
     xp = np
 
 from pygcm.numerics.double_buffer import DoubleBufferingArray as DBA
-
 
 # ---------------------------
 # Two-layer DBA state
@@ -72,7 +70,7 @@ def _new_dba(shape, dtype=np.float64, fill=0.0) -> DBA:
     return dba
 
 
-def new_two_layer_state(shape: Tuple[int, int],
+def new_two_layer_state(shape: tuple[int, int],
                         *,
                         dtype=np.float64,
                         u1=0.0, v1=0.0, h1=0.0,
@@ -135,8 +133,8 @@ def _hyperdiff(f: np.ndarray, dx: float, dy: float, k4: float) -> np.ndarray:
 def two_layer_tendencies(u1: np.ndarray, v1: np.ndarray, h1: np.ndarray,
                          u2: np.ndarray, v2: np.ndarray, h2: np.ndarray,
                          p: TwoLayerParams,
-                         h1_eq: Optional[np.ndarray],
-                         h2_eq: Optional[np.ndarray]) -> Tuple[np.ndarray, ...]:
+                         h1_eq: np.ndarray | None,
+                         h2_eq: np.ndarray | None) -> tuple[np.ndarray, ...]:
     """
     Demo tendencies:
       - Relaxation on u1,u2,h1,h2
@@ -174,7 +172,7 @@ class Atmosphere2L:
     DBA-friendly two-layer atmosphere orchestrator (demo).
     """
 
-    def __init__(self, params: Optional[TwoLayerParams] = None) -> None:
+    def __init__(self, params: TwoLayerParams | None = None) -> None:
         self.params = params or TwoLayerParams()
         self.backend = None  # placeholder for future two-layer backend
 
@@ -182,9 +180,9 @@ class Atmosphere2L:
                   state2: TwoLayerState,
                   dt: float,
                   *,
-                  h1_eq: Optional[np.ndarray] = None,
-                  h2_eq: Optional[np.ndarray] = None,
-                  extra: Optional[dict] = None) -> None:
+                  h1_eq: np.ndarray | None = None,
+                  h2_eq: np.ndarray | None = None,
+                  extra: dict | None = None) -> None:
         """
         Advance two-layer state by one step. Writes to WRITE buffers only; no swap.
         """

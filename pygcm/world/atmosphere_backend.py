@@ -18,12 +18,12 @@ Provided implementations:
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Any, Dict
+from typing import Any
 
 import numpy as np
 
 try:
-    from pygcm.jax_compat import xp  # type: ignore
+    from pygcm.jax_compat import xp
 except Exception:
     xp = np  # fallback
 
@@ -46,7 +46,7 @@ class AtmosphereBackend:
              v: np.ndarray,
              h: np.ndarray,
              dt: float,
-             **kwargs: Any) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+             **kwargs: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError
 
 
@@ -84,12 +84,12 @@ class LegacySpectralBackend(AtmosphereBackend):
                  friction_map: np.ndarray,
                  land_mask: np.ndarray,
                  *,
-                 params: Optional[LegacySpectralParams] = None,
-                 C_s_map: Optional[np.ndarray] = None,
-                 Cs_ocean: Optional[float] = None,
-                 Cs_land: Optional[float] = None,
-                 Cs_ice: Optional[float] = None,
-                 greenhouse_factor: Optional[float] = None) -> None:
+                 params: LegacySpectralParams | None = None,
+                 C_s_map: np.ndarray | None = None,
+                 Cs_ocean: float | None = None,
+                 Cs_land: float | None = None,
+                 Cs_ice: float | None = None,
+                 greenhouse_factor: float | None = None) -> None:
         from pygcm.dynamics import SpectralModel  # import here to avoid world-level hard dependency
 
         p = params or LegacySpectralParams()
@@ -124,7 +124,7 @@ class LegacySpectralBackend(AtmosphereBackend):
              v: np.ndarray,
              h: np.ndarray,
              dt: float,
-             **kwargs: Any) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+             **kwargs: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         kwargs may include (all optional, pass-through if present):
           - Teq: ndarray, equilibrium temperature forcing for the legacy engine

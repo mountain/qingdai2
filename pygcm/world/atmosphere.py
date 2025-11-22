@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Atmosphere orchestrator (DBA-friendly) — DRY, <300 LOC, engine/coupler pluggable.
 
@@ -35,7 +36,6 @@ state.swap_all()
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple as _Tuple, Any
 
 import numpy as np
 
@@ -44,20 +44,30 @@ try:
 except Exception:
     xp = np  # fallback
 
+from .atmos_api import AtmosCoupler, AtmosEngine, make_coupler, make_engine
 from .ports import (
-    SurfaceToAtmosphere,
     AtmosphereToSurfaceFluxes,
     ColumnProcessIn,
     ColumnProcessOut,
+    SurfaceToAtmosphere,
 )
-from .atmos_api import AtmosEngine, AtmosCoupler, make_engine, make_coupler
 
 
 @dataclass
 class AtmosParams:
-    """Optional wrapper to carry defaults that engines may use (kept minimal here)."""
-    # These are not used directly in this file; engines own their physical params.
-    pass
+    """Demo relaxation + hyperdiffusion parameters for the default Atmosphere engine.
+
+    These mirror DemoRelaxParams in `atmos_kernels.py` so that tests and callers can
+    configure relaxation times and hyperdiffusion in a backend-agnostic way.
+    """
+    tau_relax_u_s: float = 2.0 * 24 * 3600.0  # 2 days
+    tau_relax_v_s: float = 2.0 * 24 * 3600.0
+    tau_relax_h_s: float = 2.0 * 24 * 3600.0
+    k4_u: float = 0.0  # m^4/s, hyperdiffusion demo
+    k4_v: float = 0.0
+    k4_h: float = 0.0
+    dx_m: float = 1.0e5  # ~100 km
+    dy_m: float = 1.0e5
 
 
 class Atmosphere:
@@ -71,26 +81,49 @@ class Atmosphere:
     """
 
     def __init__(self,
-                 params: Optional[AtmosParams] = None,
+                 params: AtmosParams | None = None,
                  *,
-                 engine: Optional[AtmosEngine] = None,
-                 coupler: Optional[AtmosCoupler] = None,
+                 engine: AtmosEngine | None = None,
+                 coupler: AtmosCoupler | None = None,
                  engine_kind: str = "demo_relax",
-                 engine_kwargs: Optional[dict] = None,
+                 engine_kwargs: dict | None = None,
                  coupler_kind: str = "default",
-                 coupler_kwargs: Optional[dict] = None) -> None:
+                 coupler_kwargs: dict | None = None) -> None:
+        # Normalized parameter object (also used to seed default demo engine).
         self.params = params or AtmosParams()
-        # Engines/coupler can be injected or created via factories
-        self.engine: AtmosEngine = engine or make_engine(engine_kind, **(engine_kwargs or {}))
+
+        # Engines/coupler can be injected or created via factories.
+        if engine is not None:
+            self.engine = engine
+        else:
+            ekw: dict[str, object] = dict(engine_kwargs or {})
+            # For the built-in demo engine, propagate AtmosParams → DemoRelaxParams.
+            if engine_kind == "demo_relax":
+                from .atmos_kernels import DemoRelaxParams
+
+                demo_params = DemoRelaxParams(
+                    tau_relax_u_s=self.params.tau_relax_u_s,
+                    tau_relax_v_s=self.params.tau_relax_v_s,
+                    tau_relax_h_s=self.params.tau_relax_h_s,
+                    k4_u=self.params.k4_u,
+                    k4_v=self.params.k4_v,
+                    k4_h=self.params.k4_h,
+                    dx_m=self.params.dx_m,
+                    dy_m=self.params.dy_m,
+                )
+                # Allow explicit override via engine_kwargs if provided.
+                ekw.setdefault("params", demo_params)
+            self.engine = make_engine(engine_kind, **ekw)  # type: ignore[assignment]
+
         self.coupler: AtmosCoupler = coupler or make_coupler(coupler_kind, **(coupler_kwargs or {}))
 
     def time_step(self,
                   state,
                   dt: float,
                   *,
-                  h_eq: Optional[np.ndarray] = None,
-                  surface_in: Optional[SurfaceToAtmosphere] = None,
-                  column_in: Optional[ColumnProcessIn] = None) -> _Tuple[Optional[AtmosphereToSurfaceFluxes], Optional[ColumnProcessOut]]:
+                  h_eq: np.ndarray | None = None,
+                  surface_in: SurfaceToAtmosphere | None = None,
+                  column_in: ColumnProcessIn | None = None) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
         """
         Advance (u, v, h) one step (WRITE only; no swap). Return (fluxes, col_out).
 
@@ -133,7 +166,9 @@ def invariants_from_write(state, grid, mask=None):
 
 
 def diagnostics_report_read_write(state, grid, mask=None):
-    from .diagnostics import diagnostics_report as _rep, invariants_from_read as _ifr, invariants_from_write as _ifw
+    from .diagnostics import diagnostics_report as _rep
+    from .diagnostics import invariants_from_read as _ifr
+    from .diagnostics import invariants_from_write as _ifw
     prev = _ifr(state, grid, mask)
     nxt = _ifw(state, grid, mask)
     return _rep(prev, nxt)

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, Optional
 
 import numpy as np
+from numpy.typing import DTypeLike
 
 try:
     # Preferred import path within package
-    from pygcm.numerics.double_buffer import DoubleBufferingArray as DBA
     from pygcm.jax_compat import xp  # numpy or jax.numpy
+    from pygcm.numerics.double_buffer import DoubleBufferingArray as DBA
 except Exception:  # pragma: no cover - fallback for direct executions
-    from ..numerics.double_buffer import DoubleBufferingArray as DBA  # type: ignore
-    from ..jax_compat import xp  # type: ignore
+    from ..jax_compat import xp
+    from ..numerics.double_buffer import DoubleBufferingArray as DBA
 
 
 @dataclass
@@ -53,8 +53,8 @@ class WorldState:
     """Aggregate state for DB-aware world. All grid-shaped fields are DBAs."""
     atmos: AtmosState
     surface: SurfaceState
-    ocean: Optional[OceanState] = None
-    hydro: Optional[HydroState] = None
+    ocean: OceanState | None = None
+    hydro: HydroState | None = None
     t_seconds: float = 0.0
 
     def swap_all(self) -> None:
@@ -73,8 +73,8 @@ class WorldState:
 
 # ---------- Helpers to construct state with DBAs ----------
 
-def _alloc_dba(shape: Tuple[int, int],
-               dtype: np.dtype = np.float64,
+def _alloc_dba(shape: tuple[int, int],
+               dtype: DTypeLike = np.float64,
                initial_value: float = 0.0) -> DBA:
     """Allocate a DoubleBufferingArray with given shape, dtype and initial fill."""
     dba = DBA(shape, dtype=dtype, initial_value=initial_value)
@@ -98,11 +98,11 @@ def dba_from_array(arr: np.ndarray) -> DBA:
     return dba
 
 
-def zeros_world_state(shape: Tuple[int, int],
+def zeros_world_state(shape: tuple[int, int],
                       *,
                       include_ocean: bool = True,
                       include_hydro: bool = True,
-                      dtype: np.dtype = np.float64) -> WorldState:
+                      dtype: DTypeLike = np.float64) -> WorldState:
     """Construct a zero-initialized WorldState with DBAs of the given shape.
 
     Parameters
@@ -137,8 +137,8 @@ def zeros_world_state(shape: Tuple[int, int],
         h_ice=_alloc_dba(shape, dtype),
     )
 
-    ocean: Optional[OceanState] = None
-    hydro: Optional[HydroState] = None
+    ocean: OceanState | None = None
+    hydro: HydroState | None = None
 
     if include_ocean:
         ocean = OceanState(
@@ -169,10 +169,10 @@ def zeros_world_state_from_grid(grid) -> WorldState:
     try:
         n_lat = int(len(grid.lat))
         n_lon = int(len(grid.lon))
-    except Exception:
+    except Exception as err:
         # Fallback to attributes if available
         n_lat = int(getattr(grid, "n_lat", 0))
         n_lon = int(getattr(grid, "n_lon", 0))
         if n_lat == 0 or n_lon == 0:
-            raise ValueError("Unable to infer grid shape for world state allocation.")
+            raise ValueError("Unable to infer grid shape for world state allocation.") from err
     return zeros_world_state((n_lat, n_lon))

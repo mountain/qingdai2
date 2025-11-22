@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Demo relaxation engine (array-in/array-out) for 1-layer atmosphere.
 
@@ -15,7 +16,8 @@ Notes
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Any
+from typing import Any
+
 import numpy as np
 
 try:
@@ -47,7 +49,7 @@ class DemoRelaxEngine:
     Other kwargs are ignored (keeps signature compatible with orchestrator).
     """
 
-    def __init__(self, params: Optional[DemoRelaxParams] = None) -> None:
+    def __init__(self, params: DemoRelaxParams | None = None) -> None:
         self.p = params or DemoRelaxParams()
 
     # -------------- kernels --------------
@@ -82,7 +84,7 @@ class DemoRelaxEngine:
         h: np.ndarray,
         dt: float,
         **kwargs: Any,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Accepts optional:
           - h_eq: ndarray, equilibrium target for height relaxation
