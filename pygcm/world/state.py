@@ -17,40 +17,45 @@ except Exception:  # pragma: no cover - fallback for direct executions
 @dataclass
 class AtmosState:
     """Atmosphere prognostic/diagnostic fields wrapped by DoubleBufferingArray."""
-    u: DBA        # zonal wind (m/s)
-    v: DBA        # meridional wind (m/s)
-    h: DBA        # geopotential height proxy or layer thickness (SI)
-    Ta: DBA       # air temperature (K)
-    q: DBA        # specific humidity (kg/kg)
-    cloud: DBA    # cloud fraction (0..1)
+
+    u: DBA  # zonal wind (m/s)
+    v: DBA  # meridional wind (m/s)
+    h: DBA  # geopotential height proxy or layer thickness (SI)
+    Ta: DBA  # air temperature (K)
+    q: DBA  # specific humidity (kg/kg)
+    cloud: DBA  # cloud fraction (0..1)
 
 
 @dataclass
 class OceanState:
     """Ocean single-layer shallow-water + SST wrapped by DoubleBufferingArray."""
-    uo: DBA       # ocean zonal velocity (m/s)
-    vo: DBA       # ocean meridional velocity (m/s)
-    eta: DBA      # sea surface height anomaly (m)
-    sst: DBA      # sea surface temperature (K)
+
+    uo: DBA  # ocean zonal velocity (m/s)
+    vo: DBA  # ocean meridional velocity (m/s)
+    eta: DBA  # sea surface height anomaly (m)
+    sst: DBA  # sea surface temperature (K)
 
 
 @dataclass
 class SurfaceState:
     """Surface fields (land/sea/ice) wrapped by DoubleBufferingArray."""
-    Ts: DBA       # surface temperature (K)
-    h_ice: DBA    # sea-ice thickness (m), can be 0 over land/open ocean
+
+    Ts: DBA  # surface temperature (K)
+    h_ice: DBA  # sea-ice thickness (m), can be 0 over land/open ocean
 
 
 @dataclass
 class HydroState:
     """Hydrology reservoirs wrapped by DoubleBufferingArray."""
-    W_land: DBA   # land water storage/bucket (mm or kg/m^2, per implementation)
-    SWE: DBA      # snow water equivalent (mm or kg/m^2)
+
+    W_land: DBA  # land water storage/bucket (mm or kg/m^2, per implementation)
+    SWE: DBA  # snow water equivalent (mm or kg/m^2)
 
 
 @dataclass
 class WorldState:
     """Aggregate state for DB-aware world. All grid-shaped fields are DBAs."""
+
     atmos: AtmosState
     surface: SurfaceState
     ocean: OceanState | None = None
@@ -59,10 +64,12 @@ class WorldState:
 
     def swap_all(self) -> None:
         """Atomically flip all DBA buffers (read<=>write) for the next step."""
+
         def _swap_namespace(ns: object) -> None:
             for _, value in vars(ns).items():
                 if isinstance(value, DBA):
                     value.swap()
+
         _swap_namespace(self.atmos)
         _swap_namespace(self.surface)
         if self.ocean is not None:
@@ -73,9 +80,10 @@ class WorldState:
 
 # ---------- Helpers to construct state with DBAs ----------
 
-def _alloc_dba(shape: tuple[int, int],
-               dtype: DTypeLike = np.float64,
-               initial_value: float = 0.0) -> DBA:
+
+def _alloc_dba(
+    shape: tuple[int, int], dtype: DTypeLike = np.float64, initial_value: float = 0.0
+) -> DBA:
     """Allocate a DoubleBufferingArray with given shape, dtype and initial fill."""
     dba = DBA(shape, dtype=dtype, initial_value=initial_value)
     # Ensure both buffers have the same initial content (in case backend does lazy)
@@ -98,11 +106,13 @@ def dba_from_array(arr: np.ndarray) -> DBA:
     return dba
 
 
-def zeros_world_state(shape: tuple[int, int],
-                      *,
-                      include_ocean: bool = True,
-                      include_hydro: bool = True,
-                      dtype: DTypeLike = np.float64) -> WorldState:
+def zeros_world_state(
+    shape: tuple[int, int],
+    *,
+    include_ocean: bool = True,
+    include_hydro: bool = True,
+    dtype: DTypeLike = np.float64,
+) -> WorldState:
     """Construct a zero-initialized WorldState with DBAs of the given shape.
 
     Parameters
@@ -158,6 +168,7 @@ def zeros_world_state(shape: tuple[int, int],
 
 
 # ---------- Optional convenience for grid-aware construction ----------
+
 
 def zeros_world_state_from_grid(grid) -> WorldState:
     """Create a zero-initialized WorldState from a SphericalGrid-like object.

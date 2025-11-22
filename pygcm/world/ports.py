@@ -57,10 +57,11 @@ import numpy as np
 # Interface coupling (surface -> atmosphere)
 # ------------------------------
 
+
 @dataclass
 class SurfaceToAtmosphere:
-    T_s: np.ndarray                     # surface temperature (K)
-    land_mask: np.ndarray               # {0,1}
+    T_s: np.ndarray  # surface temperature (K)
+    land_mask: np.ndarray  # {0,1}
     ice_mask: np.ndarray | None = None  # {0,1}
     base_albedo: np.ndarray | None = None  # scalar or map before cloud/eco/ice
     friction_map: np.ndarray | None = None  # s^-1 or a roughness proxy
@@ -70,28 +71,30 @@ class SurfaceToAtmosphere:
 # Interface fluxes (atmosphere -> surface)
 # ------------------------------
 
+
 @dataclass
 class AtmosphereToSurfaceFluxes:
-    SH: np.ndarray                      # sensible heat flux (W m^-2), + upward from surface
-    LH: np.ndarray                      # latent heat flux  (W m^-2), + upward from surface
-    SW_sfc: np.ndarray                  # shortwave absorbed at surface (W m^-2)
-    LW_sfc: np.ndarray                  # net longwave at surface (W m^-2), positive downward
-    Qnet: np.ndarray                    # net surface energy to ocean/land skin (W m^-2)
-    evap_flux: np.ndarray | None = None     # kg m^-2 s^-1 (E)
-    precip_flux: np.ndarray | None = None   # kg m^-2 s^-1 (P)
+    SH: np.ndarray  # sensible heat flux (W m^-2), + upward from surface
+    LH: np.ndarray  # latent heat flux  (W m^-2), + upward from surface
+    SW_sfc: np.ndarray  # shortwave absorbed at surface (W m^-2)
+    LW_sfc: np.ndarray  # net longwave at surface (W m^-2), positive downward
+    Qnet: np.ndarray  # net surface energy to ocean/land skin (W m^-2)
+    evap_flux: np.ndarray | None = None  # kg m^-2 s^-1 (E)
+    precip_flux: np.ndarray | None = None  # kg m^-2 s^-1 (P)
 
 
 # ------------------------------
 # In-column coupling (inputs/outputs)
 # ------------------------------
 
+
 @dataclass
 class ColumnProcessIn:
-    q: np.ndarray                       # specific humidity (kg/kg)
-    cloud: np.ndarray                   # cloud fraction [0,1]
-    precip_rate: np.ndarray             # kg m^-2 s^-1
-    Ta: np.ndarray | None = None     # air temp proxy (K)
-    RH: np.ndarray | None = None     # relative humidity [0,1]
+    q: np.ndarray  # specific humidity (kg/kg)
+    cloud: np.ndarray  # cloud fraction [0,1]
+    precip_rate: np.ndarray  # kg m^-2 s^-1
+    Ta: np.ndarray | None = None  # air temp proxy (K)
+    RH: np.ndarray | None = None  # relative humidity [0,1]
 
 
 @dataclass
@@ -99,4 +102,4 @@ class ColumnProcessOut:
     q_next: np.ndarray
     cloud_next: np.ndarray
     precip_rate_next: np.ndarray
-    LH_release: np.ndarray | None = None    # latent heat release to atmosphere (W m^-2)
+    LH_release: np.ndarray | None = None  # latent heat release to atmosphere (W m^-2)

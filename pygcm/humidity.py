@@ -27,8 +27,9 @@ Units:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
+
 import numpy as np
 
 EPSILON = 0.622  # ratio of molecular weights Mw/Md for moist/dry air
@@ -38,10 +39,10 @@ EPSILON = 0.622  # ratio of molecular weights Mw/Md for moist/dry air
 class HumidityParams:
     # Bulk aero and column properties
     C_E: float = 1.3e-3
-    rho_a: float = 1.2       # kg/m^3 (near-surface)
-    h_mbl: float = 800.0     # m (effective mixed-layer height)
-    L_v: float = 2.5e6       # J/kg (latent heat of vaporization)
-    p0: float = 1.0e5        # Pa (reference pressure for q_sat)
+    rho_a: float = 1.2  # kg/m^3 (near-surface)
+    h_mbl: float = 800.0  # m (effective mixed-layer height)
+    L_v: float = 2.5e6  # J/kg (latent heat of vaporization)
+    p0: float = 1.0e5  # Pa (reference pressure for q_sat)
 
     # Surface evaporation scaling by type
     ocean_evap_scale: float = 1.0
@@ -113,10 +114,12 @@ def q_init(Ts: np.ndarray, RH0: float = 0.5, p0: float = 1.0e5) -> np.ndarray:
     return RH * q_sat(Ts, p=p0)
 
 
-def surface_evaporation_factor(land_mask: np.ndarray | None,
-                               h_ice: np.ndarray | None,
-                               params: HumidityParams,
-                               ice_threshold: float = 1e-6) -> np.ndarray:
+def surface_evaporation_factor(
+    land_mask: np.ndarray | None,
+    h_ice: np.ndarray | None,
+    params: HumidityParams,
+    ice_threshold: float = 1e-6,
+) -> np.ndarray:
     """
     Construct per-grid surface factor S_type for evaporation:
       - open ocean: ocean_evap_scale
@@ -125,10 +128,14 @@ def surface_evaporation_factor(land_mask: np.ndarray | None,
     If land_mask is None, assume all ocean (factor=ocean_evap_scale, no ice differentiation).
     """
     if land_mask is None:
-        base = np.ones_like(h_ice if h_ice is not None else 0.0) if isinstance(h_ice, np.ndarray) else 1.0
+        base = (
+            np.ones_like(h_ice if h_ice is not None else 0.0)
+            if isinstance(h_ice, np.ndarray)
+            else 1.0
+        )
         return np.full_like(base, params.ocean_evap_scale, dtype=float)
 
-    land = (land_mask == 1)
+    land = land_mask == 1
     ocean = ~land
     factor = np.zeros_like(land_mask, dtype=float)
     if h_ice is not None:
@@ -142,12 +149,14 @@ def surface_evaporation_factor(land_mask: np.ndarray | None,
     return factor
 
 
-def evaporation_flux(Ts: np.ndarray,
-                     q: np.ndarray,
-                     u: np.ndarray,
-                     v: np.ndarray,
-                     surface_factor: np.ndarray,
-                     params: HumidityParams) -> np.ndarray:
+def evaporation_flux(
+    Ts: np.ndarray,
+    q: np.ndarray,
+    u: np.ndarray,
+    v: np.ndarray,
+    surface_factor: np.ndarray,
+    params: HumidityParams,
+) -> np.ndarray:
     """
     Bulk aerodynamic evaporation mass flux (kg/m^2/s):
         E = rho_a * C_E * |V| * (q_sat(Ts) - q)_+ * S_type
@@ -159,10 +168,9 @@ def evaporation_flux(Ts: np.ndarray,
     return np.nan_to_num(E_flux, copy=False)
 
 
-def condensation(q: np.ndarray,
-                 T_a: np.ndarray,
-                 dt: float,
-                 params: HumidityParams) -> tuple[np.ndarray, np.ndarray]:
+def condensation(
+    q: np.ndarray, T_a: np.ndarray, dt: float, params: HumidityParams
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Supersaturation relaxation to saturation over timescale tau_cond:
       excess = max(0, q - q_sat(T_a))

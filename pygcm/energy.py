@@ -35,21 +35,21 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+
 import numpy as np
-from typing import Optional, Tuple, Dict
 
 from . import constants as const
 
 
 @dataclass
 class EnergyParams:
-    sw_a0: float = 0.06         # base atmospheric SW absorption
-    sw_kc: float = 0.20         # cloud shortwave absorption gain
-    lw_eps0: float = 0.70       # base atmospheric emissivity (no-cloud)
-    lw_kc: float = 0.20         # cloud longwave enhancement
-    t_floor: float = 150.0      # night-side temperature floor (K)
-    c_sfc: float = 2.0e7        # surface heat capacity (J/m^2/K)
-    diag: bool = True           # enable diagnostics printing
+    sw_a0: float = 0.06  # base atmospheric SW absorption
+    sw_kc: float = 0.20  # cloud shortwave absorption gain
+    lw_eps0: float = 0.70  # base atmospheric emissivity (no-cloud)
+    lw_kc: float = 0.20  # cloud longwave enhancement
+    t_floor: float = 150.0  # night-side temperature floor (K)
+    c_sfc: float = 2.0e7  # surface heat capacity (J/m^2/K)
+    diag: bool = True  # enable diagnostics printing
 
 
 def get_energy_params_from_env() -> EnergyParams:
@@ -58,11 +58,13 @@ def get_energy_params_from_env() -> EnergyParams:
             return float(os.getenv(env, str(default)))
         except Exception:
             return default
+
     def _i(env, default):
         try:
             return int(os.getenv(env, str(default)))
         except Exception:
             return default
+
     return EnergyParams(
         sw_a0=_f("QD_SW_A0", 0.06),
         sw_kc=_f("QD_SW_KC", 0.20),
@@ -138,34 +140,38 @@ def longwave_radiation(Ts: np.ndarray, Ta: np.ndarray, cloud: np.ndarray, params
 
 
 # ---------------- P006 extensions: cloud-optical-aware LW and surface emissivity (optional) ----------------
-def surface_emissivity_map(land_mask: np.ndarray,
-                           ice_frac: np.ndarray | float) -> np.ndarray:
+def surface_emissivity_map(land_mask: np.ndarray, ice_frac: np.ndarray | float) -> np.ndarray:
     """
     Build a per-grid surface emissivity map ε_sfc dependent on surface type.
     Defaults are physically plausible and can be tuned via env:
       QD_EPS_OCEAN (default 0.98), QD_EPS_LAND (0.96), QD_EPS_ICE (0.99)
     """
     import numpy as _np
+
     eps_ocean = float(os.getenv("QD_EPS_OCEAN", "0.98"))
-    eps_land  = float(os.getenv("QD_EPS_LAND",  "0.96"))
-    eps_ice   = float(os.getenv("QD_EPS_ICE",   "0.99"))
-    land = (land_mask == 1)
+    eps_land = float(os.getenv("QD_EPS_LAND", "0.96"))
+    eps_ice = float(os.getenv("QD_EPS_ICE", "0.99"))
+    land = land_mask == 1
     ocean = ~land
     eps = _np.full_like(ice_frac, eps_land, dtype=float)
     eps[ocean] = eps_ocean
     # Where ocean has sea-ice, blend towards ε_ice by optical ice_frac
-    eps[ocean] = (1.0 - _np.clip(ice_frac[ocean], 0.0, 1.0)) * eps_ocean + _np.clip(ice_frac[ocean], 0.0, 1.0) * eps_ice
+    eps[ocean] = (1.0 - _np.clip(ice_frac[ocean], 0.0, 1.0)) * eps_ocean + _np.clip(
+        ice_frac[ocean], 0.0, 1.0
+    ) * eps_ice
     return _np.nan_to_num(eps, copy=False)
 
 
-def longwave_radiation_v2(Ts: np.ndarray,
-                          Ta: np.ndarray,
-                          cloud_eff: np.ndarray,
-                          eps_sfc: np.ndarray | float,
-                          params: EnergyParams,
-                          *,
-                          tau0: float | None = None,
-                          k_tau: float | None = None):
+def longwave_radiation_v2(
+    Ts: np.ndarray,
+    Ta: np.ndarray,
+    cloud_eff: np.ndarray,
+    eps_sfc: np.ndarray | float,
+    params: EnergyParams,
+    *,
+    tau0: float | None = None,
+    k_tau: float | None = None,
+):
     """
     Cloud-optical-aware single-layer LW with surface emissivity.
     Idea:
@@ -179,8 +185,8 @@ def longwave_radiation_v2(Ts: np.ndarray,
     sigma = const.SIGMA
     Ts = np.maximum(0.0, Ts)
     Ta = np.maximum(0.0, Ta)
-    Ts4 = Ts ** 4
-    Ta4 = Ta ** 4
+    Ts4 = Ts**4
+    Ta4 = Ta**4
 
     # Params
     eps_clear = np.clip(float(params.lw_eps0), 0.0, 1.0)
@@ -234,13 +240,15 @@ def longwave_radiation_v2(Ts: np.ndarray,
     return LW_atm, LW_sfc, OLR, DLR, eps_eff
 
 
-def integrate_surface_energy(Ts: np.ndarray,
-                             SW_sfc: np.ndarray,
-                             LW_sfc: np.ndarray,
-                             SH: np.ndarray | float,
-                             LH: np.ndarray | float,
-                             dt: float,
-                             params: EnergyParams) -> np.ndarray:
+def integrate_surface_energy(
+    Ts: np.ndarray,
+    SW_sfc: np.ndarray,
+    LW_sfc: np.ndarray,
+    SH: np.ndarray | float,
+    LH: np.ndarray | float,
+    dt: float,
+    params: EnergyParams,
+) -> np.ndarray:
     """
     One-step explicit update of surface temperature from net surface energy.
     Ts_next = max(T_floor, Ts + dt/C_s * (SW_sfc - LW_sfc - SH - LH))
@@ -260,14 +268,16 @@ def integrate_surface_energy(Ts: np.ndarray,
     return np.nan_to_num(Ts_next, copy=False)
 
 
-def integrate_surface_energy_map(Ts: np.ndarray,
-                                 SW_sfc: np.ndarray,
-                                 LW_sfc: np.ndarray,
-                                 SH: np.ndarray | float,
-                                 LH: np.ndarray | float,
-                                 dt: float,
-                                 C_s_map: np.ndarray,
-                                 t_floor: float = 150.0) -> np.ndarray:
+def integrate_surface_energy_map(
+    Ts: np.ndarray,
+    SW_sfc: np.ndarray,
+    LW_sfc: np.ndarray,
+    SH: np.ndarray | float,
+    LH: np.ndarray | float,
+    dt: float,
+    C_s_map: np.ndarray,
+    t_floor: float = 150.0,
+) -> np.ndarray:
     """
     Per-grid heat capacity update of surface temperature:
     Ts_next = max(t_floor, Ts + dt/C_s_map * (SW_sfc - LW_sfc - SH - LH))
@@ -288,21 +298,23 @@ def integrate_surface_energy_map(Ts: np.ndarray,
     return np.nan_to_num(Ts_next, copy=False)
 
 
-def integrate_surface_energy_with_seaice(Ts: np.ndarray,
-                                         SW_sfc: np.ndarray,
-                                         LW_sfc: np.ndarray,
-                                         SH: np.ndarray | float,
-                                         LH: np.ndarray | float,
-                                         dt: float,
-                                         land_mask: np.ndarray,
-                                         h_ice: np.ndarray,
-                                         C_s_ocean: float | np.ndarray,
-                                         C_s_land: float | np.ndarray,
-                                         C_s_ice: float | np.ndarray,
-                                         t_freeze: float = 271.35,
-                                         rho_i: float = 917.0,
-                                         L_f: float = 3.34e5,
-                                         t_floor: float = 150.0) -> tuple[np.ndarray, np.ndarray]:
+def integrate_surface_energy_with_seaice(
+    Ts: np.ndarray,
+    SW_sfc: np.ndarray,
+    LW_sfc: np.ndarray,
+    SH: np.ndarray | float,
+    LH: np.ndarray | float,
+    dt: float,
+    land_mask: np.ndarray,
+    h_ice: np.ndarray,
+    C_s_ocean: float | np.ndarray,
+    C_s_land: float | np.ndarray,
+    C_s_ice: float | np.ndarray,
+    t_freeze: float = 271.35,
+    rho_i: float = 917.0,
+    L_f: float = 3.34e5,
+    t_floor: float = 150.0,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Minimal sea-ice thermodynamics:
       - Compute Q_net = SW_sfc - LW_sfc - SH - LH.
@@ -318,19 +330,13 @@ def integrate_surface_energy_with_seaice(Ts: np.ndarray,
     import numpy as np
 
     # Broadcast SH/LH if scalars
-    if np.isscalar(SH):
-        SH_arr = np.full_like(Ts, float(SH))
-    else:
-        SH_arr = SH
-    if np.isscalar(LH):
-        LH_arr = np.full_like(Ts, float(LH))
-    else:
-        LH_arr = LH
+    SH_arr = np.full_like(Ts, float(SH)) if np.isscalar(SH) else SH
+    LH_arr = np.full_like(Ts, float(LH)) if np.isscalar(LH) else LH
 
     Q_net = SW_sfc - LW_sfc - SH_arr - LH_arr  # W/m^2
 
     # Prepare masks
-    land = (land_mask == 1)
+    land = land_mask == 1
     ocean = ~land
 
     Ts_next = Ts.astype(float).copy()
@@ -339,6 +345,7 @@ def integrate_surface_energy_with_seaice(Ts: np.ndarray,
     # Ensure capacities as arrays
     def _to_arr(v):
         return v if isinstance(v, np.ndarray) else np.full_like(Ts, float(v))
+
     Cs_ocean_arr = _to_arr(C_s_ocean)
     Cs_land_arr = _to_arr(C_s_land)
     Cs_ice_arr = _to_arr(C_s_ice)
@@ -420,16 +427,18 @@ def integrate_surface_energy_with_seaice(Ts: np.ndarray,
     return Ts_next, h_ice_next
 
 
-def boundary_layer_fluxes(Ts: np.ndarray,
-                          Ta: np.ndarray,
-                          u: np.ndarray,
-                          v: np.ndarray,
-                          land_mask: np.ndarray,
-                          C_H: float = 1.5e-3,
-                          rho: float = 1.2,
-                          c_p: float = 1004.0,
-                          B_land: float = 0.7,
-                          B_ocean: float = 0.3):
+def boundary_layer_fluxes(
+    Ts: np.ndarray,
+    Ta: np.ndarray,
+    u: np.ndarray,
+    v: np.ndarray,
+    land_mask: np.ndarray,
+    C_H: float = 1.5e-3,
+    rho: float = 1.2,
+    c_p: float = 1004.0,
+    B_land: float = 0.7,
+    B_ocean: float = 0.3,
+):
     """
     Bulk formula for sensible heat; latent via Bowen ratio.
     For M1, this helper is provided but not invoked (SH=LH=0).
@@ -449,13 +458,15 @@ def boundary_layer_fluxes(Ts: np.ndarray,
     return SH, LH
 
 
-def compute_atmos_height_tendency(SW_atm: np.ndarray,
-                                  LW_atm: np.ndarray,
-                                  SH_from_sfc: np.ndarray | float,
-                                  LH_release: np.ndarray | float,
-                                  rho_air: float,
-                                  H_atm: float,
-                                  g: float = 9.81) -> np.ndarray:
+def compute_atmos_height_tendency(
+    SW_atm: np.ndarray,
+    LW_atm: np.ndarray,
+    SH_from_sfc: np.ndarray | float,
+    LH_release: np.ndarray | float,
+    rho_air: float,
+    H_atm: float,
+    g: float = 9.81,
+) -> np.ndarray:
     """
     Convert atmospheric net energy flux (W/m^2) into tendency of geopotential height h (m/s),
     using single-layer column mass rho_air*H_atm and hydrostatic scaling by g.
@@ -472,33 +483,39 @@ def compute_atmos_height_tendency(SW_atm: np.ndarray,
     return F_atm / denom
 
 
-def integrate_atmos_energy_height(h: np.ndarray,
-                                  SW_atm: np.ndarray,
-                                  LW_atm: np.ndarray,
-                                  SH_from_sfc: np.ndarray | float,
-                                  LH_release: np.ndarray | float,
-                                  dt: float,
-                                  rho_air: float,
-                                  H_atm: float,
-                                  g: float = 9.81,
-                                  weight: float = 1.0) -> np.ndarray:
+def integrate_atmos_energy_height(
+    h: np.ndarray,
+    SW_atm: np.ndarray,
+    LW_atm: np.ndarray,
+    SH_from_sfc: np.ndarray | float,
+    LH_release: np.ndarray | float,
+    dt: float,
+    rho_air: float,
+    H_atm: float,
+    g: float = 9.81,
+    weight: float = 1.0,
+) -> np.ndarray:
     """
     Advance geopotential height h by atmospheric energy tendency over dt.
     The optional 'weight' allows partial coupling (e.g., QD_ENERGY_W).
     """
-    dh_dt = compute_atmos_height_tendency(SW_atm, LW_atm, SH_from_sfc, LH_release, rho_air, H_atm, g)
+    dh_dt = compute_atmos_height_tendency(
+        SW_atm, LW_atm, SH_from_sfc, LH_release, rho_air, H_atm, g
+    )
     h_next = h + float(weight) * dh_dt * dt
     return np.nan_to_num(h_next, copy=False)
 
 
-def compute_energy_diagnostics(lat_mesh: np.ndarray,
-                               I: np.ndarray,
-                               R: np.ndarray,
-                               OLR: np.ndarray,
-                               SW_sfc: np.ndarray,
-                               LW_sfc: np.ndarray,
-                               SH: np.ndarray | float = 0.0,
-                               LH: np.ndarray | float = 0.0):
+def compute_energy_diagnostics(
+    lat_mesh: np.ndarray,
+    I: np.ndarray,
+    R: np.ndarray,
+    OLR: np.ndarray,
+    SW_sfc: np.ndarray,
+    LW_sfc: np.ndarray,
+    SH: np.ndarray | float = 0.0,
+    LH: np.ndarray | float = 0.0,
+):
     """
     Area-weighted global means for energy budgets:
       TOA_net = I - R - OLR
@@ -541,9 +558,15 @@ def compute_energy_diagnostics(lat_mesh: np.ndarray,
 # ---------------- Greenhouse autotuning (diagnostic-driven) ----------------
 
 
-def autotune_greenhouse_params(params, diag, rate_eps=None, rate_kc=None,
-                               bounds_eps=(0.30, 0.98), bounds_kc=(0.0, 0.80),
-                               verbose=None):
+def autotune_greenhouse_params(
+    params,
+    diag,
+    rate_eps=None,
+    rate_kc=None,
+    bounds_eps=(0.30, 0.98),
+    bounds_kc=(0.0, 0.80),
+    verbose=None,
+):
     """
     Nudge greenhouse coefficients based on TOA_net to approach global energy balance.
     Heuristic controller using the sign that dOLR/deps < 0 in gray one-layer model
@@ -563,17 +586,22 @@ def autotune_greenhouse_params(params, diag, rate_eps=None, rate_kc=None,
       params (same object) for convenience.
     """
     import numpy as _np
+
     err = float(diag.get("TOA_net", 0.0))  # W/m^2; target 0
     rate_eps = float(os.getenv("QD_TUNE_RATE_EPS", "5e-5")) if rate_eps is None else float(rate_eps)
-    rate_kc  = float(os.getenv("QD_TUNE_RATE_KC",  "2e-5")) if rate_kc  is None else float(rate_kc)
-    verbose = (int(os.getenv("QD_ENERGY_AUTOTUNE_DIAG", "1")) == 1) if verbose is None else bool(verbose)
+    rate_kc = float(os.getenv("QD_TUNE_RATE_KC", "2e-5")) if rate_kc is None else float(rate_kc)
+    verbose = (
+        (int(os.getenv("QD_ENERGY_AUTOTUNE_DIAG", "1")) == 1) if verbose is None else bool(verbose)
+    )
 
     # Controller: eps_new = eps_old - k * err
     # Positive err (gain energy) -> decrease eps/kc to raise OLR
     params.lw_eps0 = float(_np.clip(params.lw_eps0 - rate_eps * err, bounds_eps[0], bounds_eps[1]))
-    params.lw_kc   = float(_np.clip(params.lw_kc   - rate_kc  * err, bounds_kc[0], bounds_kc[1]))
+    params.lw_kc = float(_np.clip(params.lw_kc - rate_kc * err, bounds_kc[0], bounds_kc[1]))
 
     if verbose:
-        print(f"[EnergyTune] TOA_net={err:+.3f} W/m^2 -> eps0={params.lw_eps0:.3f}, kc={params.lw_kc:.3f}")
+        print(
+            f"[EnergyTune] TOA_net={err:+.3f} W/m^2 -> eps0={params.lw_eps0:.3f}, kc={params.lw_kc:.3f}"
+        )
 
     return params

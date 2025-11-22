@@ -4,10 +4,14 @@ physics.py
 This module contains parameterizations for physical processes in the Qingdai GCM,
 such as precipitation, cloud formation, and their feedback on radiation.
 """
+
 import os
+
 import numpy as np
 from scipy.ndimage import gaussian_filter
+
 from . import constants
+
 
 def diagnose_precipitation(gcm, grid, D_crit, k_precip, cloud_threshold=0.05, smooth_sigma=1.0):
     """
@@ -45,6 +49,7 @@ def diagnose_precipitation(gcm, grid, D_crit, k_precip, cloud_threshold=0.05, sm
 
     return precip
 
+
 def cloud_from_precip(precip, C_max=0.95, P_ref=2e-5, smooth_sigma=1.0):
     """
     Map precipitation rate to cloud cover using a smooth saturating relation:
@@ -68,6 +73,7 @@ def cloud_from_precip(precip, C_max=0.95, P_ref=2e-5, smooth_sigma=1.0):
     if smooth_sigma and smooth_sigma > 0:
         C = gaussian_filter(C, sigma=smooth_sigma)
     return np.clip(C, 0.0, 1.0)
+
 
 def parameterize_cloud_cover(gcm, grid, land_mask):
     """
@@ -96,12 +102,16 @@ def parameterize_cloud_cover(gcm, grid, land_mask):
     # --- 3) Frontal Source (Temperature Advection) ---
     T_s = gcm.T_s
     u, v = gcm.u, gcm.v
-    dx = grid.dlon_rad * constants.PLANET_RADIUS * np.maximum(1e-6, np.cos(np.deg2rad(grid.lat_mesh)))
+    dx = (
+        grid.dlon_rad
+        * constants.PLANET_RADIUS
+        * np.maximum(1e-6, np.cos(np.deg2rad(grid.lat_mesh)))
+    )
     dy = grid.dlat_rad * constants.PLANET_RADIUS
 
     grad_T_x = (np.roll(T_s, -1, axis=1) - np.roll(T_s, 1, axis=1)) / (2 * dx)
     grad_T_y = (np.roll(T_s, -1, axis=0) - np.roll(T_s, 1, axis=0)) / (2 * dy)
-    temp_advection = - (u * grad_T_x + v * grad_T_y)
+    temp_advection = -(u * grad_T_x + v * grad_T_y)
 
     frontal_threshold = 2e-5  # K/s
     fsrc = 0.3 * np.clip(np.tanh(np.abs(temp_advection) / frontal_threshold), 0.0, 1.0)
@@ -112,6 +122,7 @@ def parameterize_cloud_cover(gcm, grid, land_mask):
 
     # Clamp the final source term
     return np.clip(cloud_source, 0.0, 1.0)
+
 
 def compute_orographic_factor(grid, elevation, u, v, k_orog=7e-4, cap=2.0, smooth_sigma=1.0):
     """
@@ -136,7 +147,7 @@ def compute_orographic_factor(grid, elevation, u, v, k_orog=7e-4, cap=2.0, smoot
     cos_lat = np.maximum(np.cos(lat_rad), 1e-6)
 
     dx = a * cos_lat * grid.dlon_rad  # meters per lon step
-    dy = a * grid.dlat_rad            # meters per lat step
+    dy = a * grid.dlat_rad  # meters per lat step
 
     # Central differences for surface gradient (m/m)
     dHdx = (np.roll(elevation, -1, axis=1) - np.roll(elevation, 1, axis=1)) / (2.0 * dx)
@@ -161,21 +172,23 @@ def compute_orographic_factor(grid, elevation, u, v, k_orog=7e-4, cap=2.0, smoot
     return factor
 
 
-def calculate_dynamic_albedo(cloud_cover,
-                             T_s,
-                             base_albedo,
-                             alpha_ice,
-                             alpha_cloud,
-                             land_mask=None,
-                             t_freeze: float = 271.35,
-                             delta_T: float = 5.0,
-                             ice_only_over_ocean: bool = True,
-                             ocean_albedo_threshold: float = 0.15,
-                             ice_frac: np.ndarray | None = None,
-                             h_ice: np.ndarray | None = None,
-                             H_ref: float = 0.5,
-                             h0: float = 0.05,
-                             gamma: float = 1.0):
+def calculate_dynamic_albedo(
+    cloud_cover,
+    T_s,
+    base_albedo,
+    alpha_ice,
+    alpha_cloud,
+    land_mask=None,
+    t_freeze: float = 271.35,
+    delta_T: float = 5.0,
+    ice_only_over_ocean: bool = True,
+    ocean_albedo_threshold: float = 0.15,
+    ice_frac: np.ndarray | None = None,
+    h_ice: np.ndarray | None = None,
+    H_ref: float = 0.5,
+    h0: float = 0.05,
+    gamma: float = 1.0,
+):
     """
     Calculates dynamic albedo. Supports either:
       - A smooth temperature-based sea-ice transition (default), or
@@ -234,10 +247,10 @@ def calculate_dynamic_albedo(cloud_cover,
     # Optionally limit ice to ocean
     if ice_only_over_ocean:
         if land_mask is not None:
-            ocean_mask = (land_mask == 0)
+            ocean_mask = land_mask == 0
         else:
             if isinstance(base_albedo, np.ndarray):
-                ocean_mask = (base < float(ocean_albedo_threshold))
+                ocean_mask = base < float(ocean_albedo_threshold)
             else:
                 ocean_mask = np.ones_like(T_s_arr, dtype=bool)
         ice_frac_local = ice_frac_local * ocean_mask
@@ -250,15 +263,17 @@ def calculate_dynamic_albedo(cloud_cover,
     return np.clip(albedo, 0.0, 1.0)
 
 
-def diagnose_precipitation_hybrid(gcm,
-                                  grid,
-                                  D_crit: float = -1e-7,
-                                  k_precip: float = 1.0,
-                                  *,
-                                  orog_factor: np.ndarray | None = None,
-                                  smooth_sigma: float = 1.0,
-                                  beta_div: float = 0.4,
-                                  renorm: bool = True):
+def diagnose_precipitation_hybrid(
+    gcm,
+    grid,
+    D_crit: float = -1e-7,
+    k_precip: float = 1.0,
+    *,
+    orog_factor: np.ndarray | None = None,
+    smooth_sigma: float = 1.0,
+    beta_div: float = 0.4,
+    renorm: bool = True,
+):
     """
     Humidity-aware precipitation diagnosis (hybrid):
       - Base magnitude from humidity module's condensation P_cond (kg m^-2 s^-1)
@@ -287,7 +302,9 @@ def diagnose_precipitation_hybrid(gcm,
     P_cond = getattr(gcm, "P_cond_flux_last", None)
     if P_cond is None:
         # Fallback: use legacy convergence-based diagnostic (no cloud gating here)
-        return diagnose_precipitation(gcm, grid, D_crit, k_precip, cloud_threshold=None, smooth_sigma=smooth_sigma)
+        return diagnose_precipitation(
+            gcm, grid, D_crit, k_precip, cloud_threshold=None, smooth_sigma=smooth_sigma
+        )
 
     Pq = np.maximum(0.0, np.asarray(P_cond, dtype=float))
 
@@ -304,10 +321,7 @@ def diagnose_precipitation_hybrid(gcm,
         F_div = np.zeros_like(Pq)
 
     # 3) Orographic factor (>=1), optional
-    if orog_factor is None:
-        F_orog = 1.0
-    else:
-        F_orog = np.clip(np.asarray(orog_factor, dtype=float), 1.0, 3.0)
+    F_orog = 1.0 if orog_factor is None else np.clip(np.asarray(orog_factor, dtype=float), 1.0, 3.0)
 
     # 4) Compose multiplicative redistribution factor
     F = (1.0 + float(beta_div) * F_div) * F_orog
@@ -334,8 +348,8 @@ def diagnose_precipitation_hybrid(gcm,
     #    without altering the water-closure path (which uses P_cond in hydrology).
     try:
         use_fb = int(os.getenv("QD_P_HYBRID_FALLBACK", "1")) == 1
-        PQ_MIN = float(os.getenv("QD_PQ_MIN", "1e-8"))          # kg m^-2 s^-1 (~0.86 mm/day)
-        ALPHA_LEG = float(os.getenv("QD_P_BLEND", "0.6"))       # blend weight of legacy dyn-precip
+        PQ_MIN = float(os.getenv("QD_PQ_MIN", "1e-8"))  # kg m^-2 s^-1 (~0.86 mm/day)
+        ALPHA_LEG = float(os.getenv("QD_P_BLEND", "0.6"))  # blend weight of legacy dyn-precip
     except Exception:
         use_fb = True
         PQ_MIN = 1e-8
@@ -347,7 +361,9 @@ def diagnose_precipitation_hybrid(gcm,
         Pq_mean = float(np.sum(Pq * w) / wsum)
         if Pq_mean < PQ_MIN:
             # Legacy dynamic precipitation purely from convergence (no cloud gating) for structure
-            P_dyn = diagnose_precipitation(gcm, grid, D_crit, k_precip, cloud_threshold=None, smooth_sigma=smooth_sigma)
+            P_dyn = diagnose_precipitation(
+                gcm, grid, D_crit, k_precip, cloud_threshold=None, smooth_sigma=smooth_sigma
+            )
             # Blend fields to inject ITCZ-like signal when moisture supply is weak
             P = (1.0 - ALPHA_LEG) * P + ALPHA_LEG * P_dyn
 

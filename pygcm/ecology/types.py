@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 import numpy as np
 
 
@@ -10,6 +11,7 @@ class WeatherInstant:
     Instantaneous ecological micro-environment for sub-daily updates.
     Minimal M1 fields.
     """
+
     Ts: float | np.ndarray
     Ta: float | np.ndarray
     wind10: float | np.ndarray
@@ -23,6 +25,7 @@ class WeatherDaily:
     """
     Daily aggregated environment (M1 optional).
     """
+
     Ts_mean: float | np.ndarray
     Ta_mean: float | np.ndarray
     wind10_mean: float | np.ndarray

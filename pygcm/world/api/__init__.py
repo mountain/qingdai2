@@ -43,12 +43,14 @@ from ..ports import (
 # Layer Engine Protocols (array-in/array-out; orchestrator owns DBA)
 # --------------------------------------------------------------------
 
+
 class AtmosEngine(Protocol):
     """
     Minimal 1-layer atmosphere engine.
     step(u, v, h, dt, **kwargs) -> (u_next, v_next, h_next)
     Optional kwargs may include h_eq, Teq, base_albedo, cloud_cover, q, h_ice, etc.
     """
+
     def step(
         self,
         u: np.ndarray,
@@ -56,8 +58,7 @@ class AtmosEngine(Protocol):
         h: np.ndarray,
         dt: float,
         **kwargs: Any,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        ...
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
 
 class OceanEngine(Protocol):
@@ -66,6 +67,7 @@ class OceanEngine(Protocol):
     step(uo, vo, eta, sst, dt, **kwargs) -> (uo_next, vo_next, eta_next, sst_next)
     Optional kwargs may include wind_stress (tau_x, tau_y), Qnet, ice_mask, K parameters, etc.
     """
+
     def step(
         self,
         uo: np.ndarray,
@@ -74,8 +76,7 @@ class OceanEngine(Protocol):
         sst: np.ndarray,
         dt: float,
         **kwargs: Any,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        ...
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: ...
 
 
 class LandEngine(Protocol):
@@ -85,13 +86,13 @@ class LandEngine(Protocol):
     step(inputs, dt, **kwargs) -> outputs
     Typical inputs: {'W_land':..., 'SWE':..., 'T_soil':..., 'mask':...}
     """
+
     def step(
         self,
         inputs: dict[str, np.ndarray],
         dt: float,
         **kwargs: Any,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 class EcologyEngine(Protocol):
@@ -99,24 +100,26 @@ class EcologyEngine(Protocol):
     Ecology/biogeography engine (shape-agnostic).
     step(state, dt, **kwargs) -> state_next (dict of arrays or typed object)
     """
+
     def step(
         self,
         state: dict[str, np.ndarray],
         dt: float,
         **kwargs: Any,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 # --------------------------------------------------------------------
 # Coupler Protocols (Ports → fluxes/updates)
 # --------------------------------------------------------------------
 
+
 class RadiationCoupler(Protocol):
     """
     Compute radiative terms for atmosphere/surface from ports and state.
     Returns (SW_sfc, LW_sfc) and optionally SW_atm/LW_atm if needed.
     """
+
     def compute(
         self,
         surface: SurfaceToAtmosphere,
@@ -124,8 +127,7 @@ class RadiationCoupler(Protocol):
         grid: Any | None,
         state: Any,
         dt: float,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 class HumidityCoupler(Protocol):
@@ -133,6 +135,7 @@ class HumidityCoupler(Protocol):
     Compute evaporation/condensation and associated latent heat terms.
     Returns dict with E, LH (surface), P_cond, LH_release (atmos), optionally q_next.
     """
+
     def compute(
         self,
         surface: SurfaceToAtmosphere,
@@ -140,8 +143,7 @@ class HumidityCoupler(Protocol):
         grid: Any | None,
         state: Any,
         dt: float,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 class CloudCoupler(Protocol):
@@ -149,14 +151,14 @@ class CloudCoupler(Protocol):
     Diagnose/advance cloud cover (and related optical properties) from dynamics and column state.
     Returns dict with cloud_next and optional optical depth proxies.
     """
+
     def compute(
         self,
         column: ColumnProcessIn,
         dynamics_fields: dict[str, np.ndarray],
         grid: Any | None,
         dt: float,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 class WindStressCoupler(Protocol):
@@ -164,6 +166,7 @@ class WindStressCoupler(Protocol):
     Compute surface wind stress for ocean (and optionally drag for atmosphere) from 10m winds and surface currents.
     Returns dict with tau_x, tau_y (and optional caps/efficiencies).
     """
+
     def compute(
         self,
         u10: np.ndarray,
@@ -172,8 +175,7 @@ class WindStressCoupler(Protocol):
         vo: np.ndarray | None,
         grid: Any | None,
         dt: float,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 class OceanSurfaceCoupler(Protocol):
@@ -181,6 +183,7 @@ class OceanSurfaceCoupler(Protocol):
     Map surface energy terms to SST increment (Qnet / (rho cp H)) with ice modifiers.
     Returns dict with sst_next or dT_sst.
     """
+
     def compute(
         this,
         Qnet: np.ndarray,
@@ -188,8 +191,7 @@ class OceanSurfaceCoupler(Protocol):
         params: dict[str, Any],
         grid: Any | None,
         dt: float,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 class RoutingCoupler(Protocol):
@@ -197,26 +199,29 @@ class RoutingCoupler(Protocol):
     Route land runoff to ocean/lakes given a precomputed network.
     Returns dict with flow_accum, lake_updates, ocean_inflow diagnostics.
     """
+
     def compute(
         self,
         runoff_flux: np.ndarray,
         grid: Any | None,
         dt: float,
         **network: Any,
-    ) -> dict[str, np.ndarray]:
-        ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 # --------------------------------------------------------------------
 # Minimal Factories (optional; can be replaced by registry)
 # --------------------------------------------------------------------
 
+
 def make_atmos_engine(kind: str, **kwargs: Any) -> AtmosEngine:
     if kind == "legacy_spectral":
         from ..atmosphere_backend import LegacySpectralBackend  # noqa: E402
+
         return LegacySpectralBackend(**kwargs)
     if kind == "demo_relax":
         from ..atmos_kernels import DemoRelaxEngine  # noqa: E402
+
         return DemoRelaxEngine(**kwargs)
     raise ValueError(f"Unknown AtmosEngine kind: {kind!r}")
 
@@ -237,8 +242,10 @@ def make_coupler(kind: str, **kwargs: Any) -> Any:
         from ..routing import (
             RiverRouting,  # noqa: E402  # example: not a perfect coupler fit, but close
         )
+
         return RiverRouting(**kwargs)
     if kind == "default":
         from ..coupler import Coupler, CouplerParams  # noqa: E402
+
         return Coupler(kwargs.get("params") or CouplerParams())
     raise ValueError(f"Unknown coupler kind: {kind!r}")

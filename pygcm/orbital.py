@@ -5,20 +5,23 @@ Calculates the orbital mechanics of the Harmony-Qingdai system.
 """
 
 import numpy as np
+
 from . import constants as const
+
 
 class OrbitalSystem:
     """
     Handles the calculation of stellar positions and total energy flux
     received by the planet Qingdai.
     """
+
     def __init__(self):
         """
         Initializes the orbital system with parameters from the constants module.
         """
         # Binary star orbital period
         self.T_binary = 2 * np.pi * np.sqrt(const.A_BINARY**3 / (const.G * const.M_TOTAL_STARS))
-        
+
         # Planet orbital period
         self.T_planet = 2 * np.pi * np.sqrt(const.A_PLANET**3 / (const.G * const.M_TOTAL_STARS))
 
@@ -66,8 +69,8 @@ class OrbitalSystem:
         y_p = const.A_PLANET * np.sin(self.omega_planet * t)
 
         # Calculate distances from the planet to each star
-        d_A = np.sqrt((x_p - x_A)**2 + (y_p - y_A)**2)
-        d_B = np.sqrt((x_p - x_B)**2 + (y_p - y_B)**2)
+        d_A = np.sqrt((x_p - x_A) ** 2 + (y_p - y_A) ** 2)
+        d_B = np.sqrt((x_p - x_B) ** 2 + (y_p - y_B) ** 2)
 
         # Calculate flux from each star
         S_A = const.L_A / (4 * np.pi * d_A**2)

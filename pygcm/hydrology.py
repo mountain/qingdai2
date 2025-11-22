@@ -19,27 +19,31 @@ Conventions and units:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
+
 import numpy as np
 
 
 @dataclass
 class HydrologyParams:
-    runoff_tau_days: float = 10.0         # days, linear runoff timescale
-    wland_cap_mm: float | None = None     # mm; if set, capacity of land bucket (excess -> fast runoff)
-    snow_thresh_K: float = 273.15         # K; T threshold for snow vs rain (used with T_hat_a if lapse enabled)
-    snow_melt_rate_mm_day: float = 5.0    # mm/day equivalent melt rate (constant-mode fallback)
-    rho_w: float = 1000.0                 # kg/m^3, reference fresh water density
+    runoff_tau_days: float = 10.0  # days, linear runoff timescale
+    wland_cap_mm: float | None = None  # mm; if set, capacity of land bucket (excess -> fast runoff)
+    snow_thresh_K: float = (
+        273.15  # K; T threshold for snow vs rain (used with T_hat_a if lapse enabled)
+    )
+    snow_melt_rate_mm_day: float = 5.0  # mm/day equivalent melt rate (constant-mode fallback)
+    rho_w: float = 1000.0  # kg/m^3, reference fresh water density
     # P019 additions
-    snow_t_band_K: float = 1.5            # K; sigmoid half-width for smooth rain/snow split
-    snow_melt_mode: str = "degree_day"    # 'degree_day' | 'constant'
-    snow_ddf_mm_per_k_day: float = 3.0    # degree-day factor (mm/K/day)
-    snow_melt_tref_K: float = 273.15      # K; melt reference temperature for DDF
-    swe_enable: bool = True               # enable snowpack reservoir (SWE)
-    swe_ref_mm: float = 15.0              # mm; reference SWE for optical coverage C_snow
-    swe_max_mm: float | None = None       # optional cap for SWE (mm)
-    diag: bool = True                     # enable diagnostics printing
+    snow_t_band_K: float = 1.5  # K; sigmoid half-width for smooth rain/snow split
+    snow_melt_mode: str = "degree_day"  # 'degree_day' | 'constant'
+    snow_ddf_mm_per_k_day: float = 3.0  # degree-day factor (mm/K/day)
+    snow_melt_tref_K: float = 273.15  # K; melt reference temperature for DDF
+    swe_enable: bool = True  # enable snowpack reservoir (SWE)
+    swe_ref_mm: float = 15.0  # mm; reference SWE for optical coverage C_snow
+    swe_max_mm: float | None = None  # optional cap for SWE (mm)
+    diag: bool = True  # enable diagnostics printing
+
 
 def get_hydrology_params_from_env() -> HydrologyParams:
     def _f(env: str, default: float) -> float:
@@ -47,11 +51,13 @@ def get_hydrology_params_from_env() -> HydrologyParams:
             return float(os.getenv(env, str(default)))
         except Exception:
             return default
+
     def _i(env: str, default: int) -> int:
         try:
             return int(os.getenv(env, str(default)))
         except Exception:
             return default
+
     cap = os.getenv("QD_WLAND_CAP", "")
     try:
         wland_cap_mm = float(cap) if cap not in ("", "None", "none", "null") else None
@@ -80,7 +86,9 @@ def get_hydrology_params_from_env() -> HydrologyParams:
     )
 
 
-def partition_precip_phase(P_flux: np.ndarray, T_s: np.ndarray, T_thresh: float = 273.15) -> tuple[np.ndarray, np.ndarray]:
+def partition_precip_phase(
+    P_flux: np.ndarray, T_s: np.ndarray, T_thresh: float = 273.15
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Split total precipitation mass flux into rain and snow by a temperature threshold.
     Args:
@@ -92,15 +100,15 @@ def partition_precip_phase(P_flux: np.ndarray, T_s: np.ndarray, T_thresh: float 
     """
     P_flux = np.asarray(P_flux, dtype=float)
     T_s = np.asarray(T_s, dtype=float)
-    snow_mask = (T_s < float(T_thresh))
+    snow_mask = T_s < float(T_thresh)
     P_snow = np.where(snow_mask, P_flux, 0.0)
     P_rain = np.where(snow_mask, 0.0, P_flux)
     return np.nan_to_num(P_rain, copy=False), np.nan_to_num(P_snow, copy=False)
 
-def partition_precip_phase_smooth(P_flux: np.ndarray,
-                                  T_hat_a: np.ndarray,
-                                  T_thresh: float = 273.15,
-                                  dT_half_K: float = 1.5) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+def partition_precip_phase_smooth(
+    P_flux: np.ndarray, T_hat_a: np.ndarray, T_thresh: float = 273.15, dT_half_K: float = 1.5
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Smoothly split total precipitation into rain/snow using a sigmoid in temperature space.
     Args:
@@ -120,11 +128,14 @@ def partition_precip_phase_smooth(P_flux: np.ndarray,
     P_rain = (1.0 - f_snow) * P_flux
     return np.nan_to_num(P_rain, copy=False), np.nan_to_num(P_snow, copy=False), f_snow
 
-def snowpack_step(S_snow: np.ndarray,
-                  P_snow_land: np.ndarray,
-                  T_hat_a: np.ndarray,
-                  params: HydrologyParams,
-                  dt: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+
+def snowpack_step(
+    S_snow: np.ndarray,
+    P_snow_land: np.ndarray,
+    T_hat_a: np.ndarray,
+    params: HydrologyParams,
+    dt: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Update snowpack SWE and compute melt flux using degree-day or constant mode.
     Also returns C_snow (optical coverage) and a simple snow albedo (fresh/old not tracked here).
@@ -174,14 +185,17 @@ def snowpack_step(S_snow: np.ndarray,
         alpha_snow_val = 0.70
     alpha_snow_map = np.full_like(S_next, alpha_snow_val, dtype=float)
 
-    return np.nan_to_num(S_next, copy=False), np.nan_to_num(melt_flux_out, copy=False), C_snow, alpha_snow_map
+    return (
+        np.nan_to_num(S_next, copy=False),
+        np.nan_to_num(melt_flux_out, copy=False),
+        C_snow,
+        alpha_snow_map,
+    )
 
 
-def snow_step(S_snow: np.ndarray,
-              P_snow_land: np.ndarray,
-              T_s: np.ndarray,
-              params: HydrologyParams,
-              dt: float) -> tuple[np.ndarray, np.ndarray]:
+def snow_step(
+    S_snow: np.ndarray, P_snow_land: np.ndarray, T_s: np.ndarray, params: HydrologyParams, dt: float
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Update land snow reservoir and compute melt flux (kg m^-2 s^-1).
     Melt occurs when T_s >= snow_thresh at a fixed rate (mm/day -> kg m^-2 s^-1),
@@ -201,10 +215,10 @@ def snow_step(S_snow: np.ndarray,
     T_s = np.asarray(T_s, dtype=float)
 
     # Convert mm/day -> kg m^-2 s^-1
-    melt_rate = (float(params.snow_melt_rate_mm_day) / 86400.0)  # mm/s
+    melt_rate = float(params.snow_melt_rate_mm_day) / 86400.0  # mm/s
     melt_rate_kg = melt_rate  # 1 mm water over 1 m^2 == 1 kg, so numeric same
 
-    melt_mask = (T_s >= float(params.snow_thresh_K))
+    melt_mask = T_s >= float(params.snow_thresh_K)
     # Potential melt amount over dt
     potential_melt = np.where(melt_mask, melt_rate_kg, 0.0) * dt  # kg m^-2 over dt
     # Cap by available snow
@@ -216,11 +230,9 @@ def snow_step(S_snow: np.ndarray,
     return np.nan_to_num(S_next, copy=False), np.nan_to_num(melt_flux, copy=False)
 
 
-def update_land_bucket(W_land: np.ndarray,
-                       P_in: np.ndarray,
-                       E_land: np.ndarray,
-                       params: HydrologyParams,
-                       dt: float) -> tuple[np.ndarray, np.ndarray]:
+def update_land_bucket(
+    W_land: np.ndarray, P_in: np.ndarray, E_land: np.ndarray, params: HydrologyParams, dt: float
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Update land bucket water storage and compute runoff.
     Linear runoff R = W / tau. Optional capacity: overflow goes to immediate runoff.
@@ -264,22 +276,26 @@ def _area_weights(lat_mesh: np.ndarray) -> np.ndarray:
     w = np.maximum(np.cos(np.deg2rad(lat_mesh)), 0.0)
     return w
 
+
 def _wmean(x: np.ndarray, w: np.ndarray) -> float:
     return float(np.sum(x * w) / (np.sum(w) + 1e-15))
 
-def diagnose_water_closure(lat_mesh: np.ndarray,
-                           q: np.ndarray,
-                           rho_a: float,
-                           h_mbl: float,
-                           h_ice: np.ndarray,
-                           rho_i: float,
-                           W_land: np.ndarray,
-                           S_snow: np.ndarray,
-                           E_flux: np.ndarray,
-                           P_flux: np.ndarray,
-                           R_flux: np.ndarray,
-                           dt_since_prev: float | None,
-                           prev_total: float | None) -> dict:
+
+def diagnose_water_closure(
+    lat_mesh: np.ndarray,
+    q: np.ndarray,
+    rho_a: float,
+    h_mbl: float,
+    h_ice: np.ndarray,
+    rho_i: float,
+    W_land: np.ndarray,
+    S_snow: np.ndarray,
+    E_flux: np.ndarray,
+    P_flux: np.ndarray,
+    R_flux: np.ndarray,
+    dt_since_prev: float | None,
+    prev_total: float | None,
+) -> dict:
     """
     Compute area-weighted global means and closure residual:
       Let reservoirs (kg m^-2):

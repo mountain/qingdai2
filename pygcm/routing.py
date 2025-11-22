@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional, Dict
 
 import numpy as np
 
@@ -49,7 +48,9 @@ from . import constants
 
 def _assert_has_netcdf():
     if Dataset is None:
-        raise RuntimeError("netCDF4 is required to use RiverRouting. Install via pip install netCDF4")
+        raise RuntimeError(
+            "netCDF4 is required to use RiverRouting. Install via pip install netCDF4"
+        )
 
 
 def _ravel_index(i: int, j: int, n_lon: int) -> int:
@@ -68,7 +69,7 @@ class RoutingDiagnostics:
     flow_accum_kgps: np.ndarray  # (n_lat, n_lon)
     ocean_inflow_kgps: float
     mass_closure_error_kg: float
-    lake_volume_kg: Optional[np.ndarray] = None
+    lake_volume_kg: np.ndarray | None = None
 
 
 class RiverRouting:
@@ -82,7 +83,7 @@ class RiverRouting:
         network_nc_path: str,
         dt_hydro_hours: float = 6.0,
         treat_lake_as_water: bool = True,
-        alpha_lake: Optional[float] = None,
+        alpha_lake: float | None = None,
         diag: bool = True,
     ) -> None:
         _assert_has_netcdf()
@@ -103,6 +104,7 @@ class RiverRouting:
 
         # Load network
         with Dataset(network_nc_path, "r") as ds:
+
             def rvar(name, default=None):
                 try:
                     return np.array(ds.variables[name][:])
@@ -113,13 +115,15 @@ class RiverRouting:
             if self.land_mask is None:
                 raise RuntimeError("hydrology_network.nc missing 'land_mask' variable")
             # Flat land mask for quick membership tests (row-major)
-            self.land_flat = (self.land_mask.flatten(order="C") == 1)
+            self.land_flat = self.land_mask.flatten(order="C") == 1
 
             flow_to = rvar("flow_to_index")
             if flow_to is None:
                 raise RuntimeError("hydrology_network.nc missing 'flow_to_index' variable")
             if flow_to.shape != self.shape:
-                raise RuntimeError(f"flow_to_index shape {flow_to.shape} != grid shape {self.shape}")
+                raise RuntimeError(
+                    f"flow_to_index shape {flow_to.shape} != grid shape {self.shape}"
+                )
             self.flow_to_index = flow_to.astype(np.int64)
 
             flow_order = rvar("flow_order")
@@ -140,7 +144,9 @@ class RiverRouting:
                 lake_out_i = rvar("lake_outlet_i", None)
                 lake_out_j = rvar("lake_outlet_j", None)
                 if lake_out_i is not None and lake_out_j is not None:
-                    lake_out_idx = (lake_out_j.astype(np.int64) * self.n_lon + lake_out_i.astype(np.int64))
+                    lake_out_idx = lake_out_j.astype(np.int64) * self.n_lon + lake_out_i.astype(
+                        np.int64
+                    )
             self.lake_outlet_index = lake_out_idx
 
             # Optional lake meta
@@ -162,7 +168,7 @@ class RiverRouting:
 
         self._flow_accum_kg = np.zeros(self.n_cells, dtype=np.float64)  # event mass per cell
         self._ocean_inflow_kg = 0.0
-        self._diag_cache: Optional[RoutingDiagnostics] = None
+        self._diag_cache: RoutingDiagnostics | None = None
 
         # Lake storage (v1: not actively used in routing; placeholder for future)
         self.lake_volume_kg = None
@@ -170,8 +176,10 @@ class RiverRouting:
             self.lake_volume_kg = np.zeros(self.n_lakes, dtype=np.float64)
 
         if self.diag_enabled:
-            print(f"[Routing] Loaded network: land={int(self.land_mask.sum())} cells, "
-                  f"n_lakes={self.n_lakes}, dt_hydro={self.dt_hydro_seconds/3600.0:.1f} h")
+            print(
+                f"[Routing] Loaded network: land={int(self.land_mask.sum())} cells, "
+                f"n_lakes={self.n_lakes}, dt_hydro={self.dt_hydro_seconds/3600.0:.1f} h"
+            )
 
     def _compute_cell_areas(self) -> np.ndarray:
         """
@@ -183,8 +191,16 @@ class RiverRouting:
         lons = np.asarray(self.grid.lon, dtype=float)  # degrees
         if lats.size != self.n_lat or lons.size != self.n_lon:
             # Fall back to mesh-based spacing
-            dphi = np.deg2rad(abs(self.grid.lat[1] - self.grid.lat[0])) if self.n_lat > 1 else np.deg2rad(1.5)
-            dlam = np.deg2rad(abs(self.grid.lon[1] - self.grid.lon[0])) if self.n_lon > 1 else np.deg2rad(1.5)
+            dphi = (
+                np.deg2rad(abs(self.grid.lat[1] - self.grid.lat[0]))
+                if self.n_lat > 1
+                else np.deg2rad(1.5)
+            )
+            dlam = (
+                np.deg2rad(abs(self.grid.lon[1] - self.grid.lon[0]))
+                if self.n_lon > 1
+                else np.deg2rad(1.5)
+            )
         else:
             dphi = np.deg2rad(abs(lats[1] - lats[0])) if self.n_lat > 1 else np.deg2rad(1.5)
             dlam = np.deg2rad(abs(lons[1] - lons[0])) if self.n_lon > 1 else np.deg2rad(1.5)
@@ -193,7 +209,7 @@ class RiverRouting:
         phi_cent = np.deg2rad(self.grid.lat_mesh[:, 0])  # 1D lat per row
         phi_plus = np.clip(phi_cent + 0.5 * dphi, -0.5 * np.pi, 0.5 * np.pi)
         phi_minus = np.clip(phi_cent - 0.5 * dphi, -0.5 * np.pi, 0.5 * np.pi)
-        band_area = (np.sin(phi_plus) - np.sin(phi_minus))  # shape (n_lat,)
+        band_area = np.sin(phi_plus) - np.sin(phi_minus)  # shape (n_lat,)
 
         A_row = (R * R) * dlam * band_area  # area per cell in row
         A = np.repeat(A_row[:, None], self.n_lon, axis=1)
@@ -212,8 +228,8 @@ class RiverRouting:
         self,
         R_land_flux: np.ndarray,
         dt_seconds: float,
-        precip_flux: Optional[np.ndarray] = None,
-        evap_flux: Optional[np.ndarray] = None,
+        precip_flux: np.ndarray | None = None,
+        evap_flux: np.ndarray | None = None,
     ) -> None:
         """
         Accumulate and, when hydrology step is reached, route mass along the network.
@@ -229,7 +245,7 @@ class RiverRouting:
         if R.shape != self.shape:
             raise ValueError(f"R_land_flux shape {R.shape} != grid shape {self.shape}")
 
-        land = (self.land_mask == 1)
+        land = self.land_mask == 1
         mass_incr = R * self.cell_area * float(dt_seconds)
         mass_incr = np.where(land, mass_incr, 0.0)
         self.buffer_kg += mass_incr.flatten(order="C")
@@ -302,7 +318,12 @@ class RiverRouting:
 
         # Optionally update lake storage from (P - E) over lake area for the event window
         lake_delta_mass = 0.0
-        if has_lakes and self.lake_volume_kg is not None and precip_flux is not None and evap_flux is not None:
+        if (
+            has_lakes
+            and self.lake_volume_kg is not None
+            and precip_flux is not None
+            and evap_flux is not None
+        ):
             P = np.asarray(precip_flux, dtype=float)
             E = np.asarray(evap_flux, dtype=float)
             lake_mask_bool = self.lake_mask.astype(bool)
@@ -313,7 +334,11 @@ class RiverRouting:
                 ids = self.lake_id
                 for k in range(1, self.n_lakes + 1):
                     lake_area = np.sum(np.where((ids == k), self.cell_area, 0.0))
-                    frac = 0.0 if lake_area <= 0 else lake_area / np.sum(np.where(lake_mask_bool, self.cell_area, 0.0))
+                    frac = (
+                        0.0
+                        if lake_area <= 0
+                        else lake_area / np.sum(np.where(lake_mask_bool, self.cell_area, 0.0))
+                    )
                     self.lake_volume_kg[k - 1] += frac * lake_add
                 lake_delta_mass = lake_add
 
@@ -327,14 +352,18 @@ class RiverRouting:
             flow_accum_kgps=flow_accum_kgps,
             ocean_inflow_kgps=float(self._ocean_inflow_kg / max(event_dt, 1e-9)),
             mass_closure_error_kg=float(closure_err),
-            lake_volume_kg=(self.lake_volume_kg.copy() if self.lake_volume_kg is not None else None),
+            lake_volume_kg=(
+                self.lake_volume_kg.copy() if self.lake_volume_kg is not None else None
+            ),
         )
 
         if self.diag_enabled:
-            print(f"[HydroRouting] ocean_inflow={self._diag_cache.ocean_inflow_kgps:.3e} kg/s | "
-                  f"mass_error={self._diag_cache.mass_closure_error_kg:.3e} kg")
+            print(
+                f"[HydroRouting] ocean_inflow={self._diag_cache.ocean_inflow_kgps:.3e} kg/s | "
+                f"mass_error={self._diag_cache.mass_closure_error_kg:.3e} kg"
+            )
 
-    def diagnostics(self) -> Dict[str, object]:
+    def diagnostics(self) -> dict[str, object]:
         """
         Return the last routing diagnostics. If no routing event has occurred yet, returns zeros.
         """
@@ -344,7 +373,9 @@ class RiverRouting:
                 "flow_accum_kgps": zeros,
                 "ocean_inflow_kgps": 0.0,
                 "mass_closure_error_kg": 0.0,
-                "lake_volume_kg": (np.zeros(self.n_lakes, dtype=float) if self.n_lakes > 0 else None),
+                "lake_volume_kg": (
+                    np.zeros(self.n_lakes, dtype=float) if self.n_lakes > 0 else None
+                ),
             }
         return {
             "flow_accum_kgps": self._diag_cache.flow_accum_kgps,

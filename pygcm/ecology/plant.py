@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional, Dict
 
 import numpy as np
-import os
 
 from .genes import Genes
 
@@ -23,10 +22,10 @@ class PlantReport:
     energy_gain: float
     leaf_area: float
     state: PlantState
-    transitioned_to: Optional[PlantState] = None
+    transitioned_to: PlantState | None = None
     seed_count: int = 0
     # Optional: daily reflectance bands R_b (shape [NB]) when band inputs are provided
-    reflectance_bands: Optional[np.ndarray] = None
+    reflectance_bands: np.ndarray | None = None
 
 
 @dataclass
@@ -37,11 +36,14 @@ class Plant:
     - Sub-daily: accumulate daily energy buffer（不做形态大跳转）
     - Daily: 状态机 & 形态学更新（能量投资、GDD、寿命/胁迫触发）
     """
+
     genes: Genes
     state: PlantState = PlantState.SEED
     age_days: int = 0
     # biomass "energy units"（抽象单位，与 genes.leaf_area_per_energy 配套）
-    biomass: Dict[str, float] = field(default_factory=lambda: {"root": 0.0, "stem": 0.0, "leaf": 0.0})
+    biomass: dict[str, float] = field(
+        default_factory=lambda: {"root": 0.0, "stem": 0.0, "leaf": 0.0}
+    )
     energy_storage: float = 0.0
     # diagnostics / memory
     gdd_accum: float = 0.0
@@ -53,8 +55,8 @@ class Plant:
     _E_day_buffer: float = 0.0
 
     # Parameters（可按需求扩展到 env）：
-    height_exponent: float = 0.8   # height ∝ stem^γ
-    repro_fraction: float = 0.2    # fraction of daily energy to reproduction when MATURE
+    height_exponent: float = 0.8  # height ∝ stem^γ
+    repro_fraction: float = 0.2  # fraction of daily energy to reproduction when MATURE
 
     def effective_leaf_area(self) -> float:
         return max(0.0, float(self.leaf_area))
@@ -62,7 +64,9 @@ class Plant:
     def is_alive(self) -> bool:
         return self.state not in (PlantState.DEAD,)
 
-    def update_substep(self, I_eff_scalar: float, dt_seconds: float, soil_water_index: Optional[float] = None) -> None:
+    def update_substep(
+        self, I_eff_scalar: float, dt_seconds: float, soil_water_index: float | None = None
+    ) -> None:
         """
         Sub-daily accumulation of daily energy buffer.
         I_eff_scalar: 已按带积分后的有效光强（W m^-2）或外部提供的 J/s 等价
@@ -83,9 +87,9 @@ class Plant:
         I_bands: np.ndarray,
         A_b_genotype: np.ndarray,
         dt_seconds: float,
-        delta_lambda: Optional[np.ndarray] = None,
+        delta_lambda: np.ndarray | None = None,
         light_availability: float = 1.0,
-        soil_water_index: Optional[float] = None,
+        soil_water_index: float | None = None,
     ) -> None:
         """
         子步（谱带）能量累积接口（M1/M2）：
@@ -127,7 +131,7 @@ class Plant:
             if float(soil_water_index) < float(self.genes.drought_tolerance):
                 self.water_stress_days += dt / 86400.0
 
-    def _maybe_transition(self, Ts_day: float, day_length_hours: float) -> Optional[PlantState]:
+    def _maybe_transition(self, Ts_day: float, day_length_hours: float) -> PlantState | None:
         """
         状态机转换（最小规则）：
         - SEED → GROWING：GDD≥阈值 & 轻微水分条件满足
@@ -147,7 +151,9 @@ class Plant:
             return transitioned
 
         if self.state == PlantState.SEED:
-            if (self.gdd_accum >= float(self.genes.gdd_germinate)) and (self.water_stress_days < 1.0):
+            if (self.gdd_accum >= float(self.genes.gdd_germinate)) and (
+                self.water_stress_days < 1.0
+            ):
                 self.state = PlantState.GROWING
                 transitioned = PlantState.GROWING
 
@@ -159,8 +165,9 @@ class Plant:
 
         elif self.state == PlantState.MATURE:
             # 若持续水分胁迫或接近寿命：进入 SENESCENT
-            if (self.water_stress_days >=  float(os.getenv("QD_ECO_STRESS_WATER_DAYS", "7"))) or \
-               (self.age_days >= int(0.9 * self.genes.lifespan_days)):
+            if (self.water_stress_days >= float(os.getenv("QD_ECO_STRESS_WATER_DAYS", "7"))) or (
+                self.age_days >= int(0.9 * self.genes.lifespan_days)
+            ):
                 self.state = PlantState.SENESCENT
                 transitioned = PlantState.SENESCENT
 
@@ -199,11 +206,11 @@ class Plant:
         Ts_day: float,
         day_length_hours: float,
         soil_water_index: float,
-        I_bands_weighted_scalar: Optional[float] = None,
+        I_bands_weighted_scalar: float | None = None,
         *,
-        I_bands: Optional[np.ndarray] = None,
-        A_b_genotype: Optional[np.ndarray] = None,
-        delta_lambda: Optional[np.ndarray] = None,
+        I_bands: np.ndarray | None = None,
+        A_b_genotype: np.ndarray | None = None,
+        delta_lambda: np.ndarray | None = None,
         light_availability: float = 1.0,
     ) -> PlantReport:
         """
@@ -222,13 +229,15 @@ class Plant:
         同时在提供 band 输入时输出当日 R_b=1−A_eff（限幅 [0,1]），便于日级诊断。
         """
         if not self.is_alive():
-            return PlantReport(energy_gain=0.0, leaf_area=self.effective_leaf_area(), state=self.state)
+            return PlantReport(
+                energy_gain=0.0, leaf_area=self.effective_leaf_area(), state=self.state
+            )
 
         transitioned = self._maybe_transition(Ts_day, day_length_hours)
 
         # 1) 带积分路径（可选）
         E_banded = 0.0
-        R_b: Optional[np.ndarray] = None
+        R_b: np.ndarray | None = None
         if (I_bands is not None) and (A_b_genotype is not None):
             I_b = np.asarray(I_bands, dtype=float).ravel()
             A_b = np.clip(np.asarray(A_b_genotype, dtype=float).ravel(), 0.0, 1.0)
@@ -272,7 +281,9 @@ class Plant:
         self._E_day_buffer = 0.0
 
         # 3) 外部等效代理（可选）
-        E_proxy = 0.0 if (I_bands_weighted_scalar is None) else max(0.0, float(I_bands_weighted_scalar))
+        E_proxy = (
+            0.0 if (I_bands_weighted_scalar is None) else max(0.0, float(I_bands_weighted_scalar))
+        )
 
         # 当日总能量
         E_gain_day = E_banded + E_buffer + E_proxy

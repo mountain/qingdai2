@@ -51,6 +51,7 @@ from pygcm.numerics.double_buffer import DoubleBufferingArray as DBA
 # Two-layer DBA state
 # ---------------------------
 
+
 @dataclass
 class TwoLayerState:
     u1: DBA
@@ -70,11 +71,9 @@ def _new_dba(shape, dtype=np.float64, fill=0.0) -> DBA:
     return dba
 
 
-def new_two_layer_state(shape: tuple[int, int],
-                        *,
-                        dtype=np.float64,
-                        u1=0.0, v1=0.0, h1=0.0,
-                        u2=0.0, v2=0.0, h2=0.0) -> TwoLayerState:
+def new_two_layer_state(
+    shape: tuple[int, int], *, dtype=np.float64, u1=0.0, v1=0.0, h1=0.0, u2=0.0, v2=0.0, h2=0.0
+) -> TwoLayerState:
     return TwoLayerState(
         u1=_new_dba(shape, dtype=dtype, fill=u1),
         v1=_new_dba(shape, dtype=dtype, fill=v1),
@@ -89,14 +88,15 @@ def new_two_layer_state(shape: tuple[int, int],
 # Pure-kernel demo numerics
 # ---------------------------
 
+
 @dataclass
 class TwoLayerParams:
     # layer reference depths (m); only enter demo coupling scales
     H1_m: float = 5000.0
     H2_m: float = 5000.0
     # gravities
-    g: float = 9.81       # external mode surface gravity
-    g_red: float = 0.2    # reduced gravity for internal mode (demo scale)
+    g: float = 9.81  # external mode surface gravity
+    g_red: float = 0.2  # reduced gravity for internal mode (demo scale)
     # simple linear relaxations (s)
     tau_u_s: float = 2.0 * 24 * 3600.0
     tau_h_s: float = 2.0 * 24 * 3600.0
@@ -130,11 +130,17 @@ def _hyperdiff(f: np.ndarray, dx: float, dy: float, k4: float) -> np.ndarray:
     return -k4 * lap2
 
 
-def two_layer_tendencies(u1: np.ndarray, v1: np.ndarray, h1: np.ndarray,
-                         u2: np.ndarray, v2: np.ndarray, h2: np.ndarray,
-                         p: TwoLayerParams,
-                         h1_eq: np.ndarray | None,
-                         h2_eq: np.ndarray | None) -> tuple[np.ndarray, ...]:
+def two_layer_tendencies(
+    u1: np.ndarray,
+    v1: np.ndarray,
+    h1: np.ndarray,
+    u2: np.ndarray,
+    v2: np.ndarray,
+    h2: np.ndarray,
+    p: TwoLayerParams,
+    h1_eq: np.ndarray | None,
+    h2_eq: np.ndarray | None,
+) -> tuple[np.ndarray, ...]:
     """
     Demo tendencies:
       - Relaxation on u1,u2,h1,h2
@@ -156,7 +162,7 @@ def two_layer_tendencies(u1: np.ndarray, v1: np.ndarray, h1: np.ndarray,
     # weak internal mode coupling (demo): push h1 and h2 toward each other with strength ~ g_red
     # This mimics a crude baroclinic restoring without computing gradients.
     alpha = 0.5 * p.g_red / max(p.H1_m + p.H2_m, 1.0)
-    d = (h1 - h2)
+    d = h1 - h2
     dh1 += -alpha * d
     dh2 += +alpha * d
 
@@ -167,6 +173,7 @@ def two_layer_tendencies(u1: np.ndarray, v1: np.ndarray, h1: np.ndarray,
 # Orchestrator
 # ---------------------------
 
+
 class Atmosphere2L:
     """
     DBA-friendly two-layer atmosphere orchestrator (demo).
@@ -176,13 +183,15 @@ class Atmosphere2L:
         self.params = params or TwoLayerParams()
         self.backend = None  # placeholder for future two-layer backend
 
-    def time_step(self,
-                  state2: TwoLayerState,
-                  dt: float,
-                  *,
-                  h1_eq: np.ndarray | None = None,
-                  h2_eq: np.ndarray | None = None,
-                  extra: dict | None = None) -> None:
+    def time_step(
+        self,
+        state2: TwoLayerState,
+        dt: float,
+        *,
+        h1_eq: np.ndarray | None = None,
+        h2_eq: np.ndarray | None = None,
+        extra: dict | None = None,
+    ) -> None:
         """
         Advance two-layer state by one step. Writes to WRITE buffers only; no swap.
         """
@@ -214,12 +223,14 @@ class Atmosphere2L:
 # Quick diagnostics helpers
 # ---------------------------
 
+
 def barotropic_mass(h1: np.ndarray, h2: np.ndarray) -> float:
     return float(xp.sum(xp.nan_to_num(h1 + h2)))
 
 
-def barotropic_ke(u1: np.ndarray, v1: np.ndarray, h1: np.ndarray,
-                  u2: np.ndarray, v2: np.ndarray, h2: np.ndarray) -> float:
+def barotropic_ke(
+    u1: np.ndarray, v1: np.ndarray, h1: np.ndarray, u2: np.ndarray, v2: np.ndarray, h2: np.ndarray
+) -> float:
     return float(xp.sum(0.5 * (h1 * (u1 * u1 + v1 * v1) + h2 * (u2 * u2 + v2 * v2))))
 
 

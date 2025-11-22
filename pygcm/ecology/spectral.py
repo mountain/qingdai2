@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
-import numpy as np
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
@@ -11,6 +12,7 @@ class SpectralBands:
     Discrete spectral bands for visible/near-visible shortwave.
     Wavelength unit: nm.
     """
+
     nbands: int
     lambda_edges: np.ndarray  # shape [NB+1]
     lambda_centers: np.ndarray  # shape [NB]
@@ -20,9 +22,9 @@ class SpectralBands:
         return self.nbands, self.lambda_edges, self.lambda_centers, self.delta_lambda
 
 
-def make_bands(nbands: int | None = None,
-               lam0_nm: float | None = None,
-               lam1_nm: float | None = None) -> SpectralBands:
+def make_bands(
+    nbands: int | None = None, lam0_nm: float | None = None, lam1_nm: float | None = None
+) -> SpectralBands:
     """
     Construct equally spaced spectral bands in [lam0, lam1] (nm).
     Defaults: NB from env QD_ECO_SPECTRAL_BANDS (fallback 16),
@@ -36,7 +38,7 @@ def make_bands(nbands: int | None = None,
     if lam0_nm is None or lam1_nm is None:
         rng = os.getenv("QD_ECO_SPECTRAL_RANGE_NM", "380,780")
         try:
-            lam0_nm, lam1_nm = [float(x.strip()) for x in rng.split(",")]
+            lam0_nm, lam1_nm = (float(x.strip()) for x in rng.split(","))
         except Exception:
             lam0_nm, lam1_nm = 380.0, 780.0
     # Guard
@@ -48,17 +50,16 @@ def make_bands(nbands: int | None = None,
 
     edges = np.linspace(lam0_nm, lam1_nm, nbands + 1)
     centers = 0.5 * (edges[:-1] + edges[1:])
-    widths = (edges[1:] - edges[:-1])
-    return SpectralBands(nbands=nbands,
-                         lambda_edges=edges.astype(float),
-                         lambda_centers=centers.astype(float),
-                         delta_lambda=widths.astype(float))
+    widths = edges[1:] - edges[:-1]
+    return SpectralBands(
+        nbands=nbands,
+        lambda_edges=edges.astype(float),
+        lambda_centers=centers.astype(float),
+        delta_lambda=widths.astype(float),
+    )
 
 
-def _rayleigh_weight(centers_nm: np.ndarray,
-                     t0: float,
-                     lref_nm: float,
-                     eta: float) -> np.ndarray:
+def _rayleigh_weight(centers_nm: np.ndarray, t0: float, lref_nm: float, eta: float) -> np.ndarray:
     """
     Simplified Rayleigh transmittance weight ~ T0 * (λ/λ_ref)^eta (eta≈4).
     We will normalize later, so absolute scale is not critical.
@@ -79,15 +80,17 @@ def _greenish_leaf_reflectance(centers_nm: np.ndarray) -> np.ndarray:
     mu = 550.0
     sigma = 60.0
     base = 0.25
-    bump = 0.15 * np.exp(-((centers_nm - mu) ** 2) / (2.0 * sigma ** 2))
+    bump = 0.15 * np.exp(-((centers_nm - mu) ** 2) / (2.0 * sigma**2))
     r = np.clip(base + bump, 0.0, 1.0)
     return r
 
 
-def toa_to_surface_bands(I_total: np.ndarray,
-                         cloud_eff: np.ndarray | float,
-                         bands: SpectralBands,
-                         mode: str | None = None) -> np.ndarray:
+def toa_to_surface_bands(
+    I_total: np.ndarray,
+    cloud_eff: np.ndarray | float,
+    bands: SpectralBands,
+    mode: str | None = None,
+) -> np.ndarray:
     """
     Convert total shortwave at TOA/surface proxy (I_total, W/m^2) into band-averaged intensities.
     For M1, we compute a global band weight vector and apply to each grid cell:
@@ -134,8 +137,7 @@ def toa_to_surface_bands(I_total: np.ndarray,
     return I_b
 
 
-def band_weights_from_mode(bands: SpectralBands,
-                           mode: str | None = None) -> np.ndarray:
+def band_weights_from_mode(bands: SpectralBands, mode: str | None = None) -> np.ndarray:
     """
     Return normalized band weights (sum=1) for given mode (simple|rayleigh).
     Useful for reducing band albedo to scalar alpha by alpha = sum(A_b * w_b).
@@ -181,7 +183,9 @@ def absorbance_from_genes(bands: SpectralBands, genes) -> np.ndarray:
       A_b = 1 - default_leaf_reflectance(bands)
     """
     NB = int(getattr(bands, "nbands", 1))
-    lam = np.asarray(getattr(bands, "lambda_centers", np.linspace(400.0, 700.0, NB)), dtype=float).ravel()
+    lam = np.asarray(
+        getattr(bands, "lambda_centers", np.linspace(400.0, 700.0, NB)), dtype=float
+    ).ravel()
     if lam.shape[0] != NB:
         lam = np.linspace(float(lam.min(initial=400.0)), float(lam.max(initial=700.0)), NB)
 
@@ -221,7 +225,7 @@ def absorbance_from_genes(bands: SpectralBands, genes) -> np.ndarray:
         w = max(1e-3, float(w))
         h = float(np.clip(h, 0.0, 1.0))
         # Gaussian peak (sigma = width_nm)
-        A += h * np.exp(-((lam - c) ** 2) / (2.0 * w ** 2))
+        A += h * np.exp(-((lam - c) ** 2) / (2.0 * w**2))
 
     # Clip to [0,1]
     A = np.clip(A, 0.0, 1.0)
@@ -232,10 +236,13 @@ def absorbance_from_genes(bands: SpectralBands, genes) -> np.ndarray:
 
 _T_SUN = 5778.0  # K
 _h = 6.62607015e-34  # J*s
-_c = 2.99792458e8    # m/s
-_kB = 1.380649e-23   # J/K
+_c = 2.99792458e8  # m/s
+_kB = 1.380649e-23  # J/K
 
-def estimate_teff_from_LM(L_ratio: float, M_ratio: float, j: float = 0.8, T_sun: float = _T_SUN) -> float:
+
+def estimate_teff_from_LM(
+    L_ratio: float, M_ratio: float, j: float = 0.8, T_sun: float = _T_SUN
+) -> float:
     """
     Estimate main-sequence effective temperature (K) from luminosity and mass ratios using:
         T = T_sun * (L/L_sun)^(1/4) * (M/M_sun)^(-j/2)
@@ -243,7 +250,7 @@ def estimate_teff_from_LM(L_ratio: float, M_ratio: float, j: float = 0.8, T_sun:
     """
     L_ratio = float(max(L_ratio, 1e-12))
     M_ratio = float(max(M_ratio, 1e-12))
-    return float(T_sun * (L_ratio ** 0.25) * (M_ratio ** (-0.5 * j)))
+    return float(T_sun * (L_ratio**0.25) * (M_ratio ** (-0.5 * j)))
 
 
 def _planck_lambda_nm(T: float, lambda_nm: np.ndarray) -> np.ndarray:
@@ -258,7 +265,7 @@ def _planck_lambda_nm(T: float, lambda_nm: np.ndarray) -> np.ndarray:
     # Avoid overflow: for large x, exp(x) is huge; use np.exp with clipping
     x = np.clip(x, 1e-8, 1e3)
     denom = np.expm1(x)  # exp(x) - 1 with better small-x behavior
-    B = (1.0 / (lam_m ** 5)) * (1.0 / (denom + 1e-30))
+    B = (1.0 / (lam_m**5)) * (1.0 / (denom + 1e-30))
     # We omit the constant (2hc^2) because we only need relative shape
     B = np.clip(B, 0.0, np.inf)
     return B
@@ -271,7 +278,7 @@ def _normalize_spectrum_to_bands(B_lambda: np.ndarray, bands: SpectralBands) -> 
     """
     w = np.asarray(B_lambda, dtype=float) * np.asarray(bands.delta_lambda, dtype=float)
     wsum = float(np.sum(w)) + 1e-30
-    return (w / wsum)
+    return w / wsum
 
 
 def blackbody_band_weights(T_eff: float, bands: SpectralBands) -> np.ndarray:
@@ -301,18 +308,20 @@ def _rayleigh_band_factor(bands: SpectralBands) -> np.ndarray:
     return _rayleigh_weight(bands.lambda_centers, t0, lref, eta)
 
 
-def dual_star_insolation_to_bands(insA: np.ndarray,
-                                  insB: np.ndarray,
-                                  bands: SpectralBands,
-                                  *,
-                                  T_eff_A: float | None = None,
-                                  T_eff_B: float | None = None,
-                                  j_A: float | None = None,
-                                  j_B: float | None = None,
-                                  L_ratio_A: float | None = None,
-                                  M_ratio_A: float | None = None,
-                                  L_ratio_B: float | None = None,
-                                  M_ratio_B: float | None = None) -> np.ndarray:
+def dual_star_insolation_to_bands(
+    insA: np.ndarray,
+    insB: np.ndarray,
+    bands: SpectralBands,
+    *,
+    T_eff_A: float | None = None,
+    T_eff_B: float | None = None,
+    j_A: float | None = None,
+    j_B: float | None = None,
+    L_ratio_A: float | None = None,
+    M_ratio_A: float | None = None,
+    L_ratio_B: float | None = None,
+    M_ratio_B: float | None = None,
+) -> np.ndarray:
     """
     Compute per-pixel band-averaged shortwave intensities [NB, nlat, nlon] for a dual-star system.
 
@@ -346,10 +355,14 @@ def dual_star_insolation_to_bands(insA: np.ndarray,
             L_ratio_B = 1.0 if L_ratio_B is None else L_ratio_B
             M_ratio_B = 1.0 if M_ratio_B is None else M_ratio_B
         else:
-            if L_ratio_A is None: L_ratio_A = float(getattr(const, "L_A", 1.0) / getattr(const, "L_SUN", 3.828e26))
-            if M_ratio_A is None: M_ratio_A = float(getattr(const, "M_A", 1.0) / getattr(const, "M_SUN", 1.989e30))
-            if L_ratio_B is None: L_ratio_B = float(getattr(const, "L_B", 1.0) / getattr(const, "L_SUN", 3.828e26))
-            if M_ratio_B is None: M_ratio_B = float(getattr(const, "M_B", 1.0) / getattr(const, "M_SUN", 1.989e30))
+            if L_ratio_A is None:
+                L_ratio_A = float(getattr(const, "L_A", 1.0) / getattr(const, "L_SUN", 3.828e26))
+            if M_ratio_A is None:
+                M_ratio_A = float(getattr(const, "M_A", 1.0) / getattr(const, "M_SUN", 1.989e30))
+            if L_ratio_B is None:
+                L_ratio_B = float(getattr(const, "L_B", 1.0) / getattr(const, "L_SUN", 3.828e26))
+            if M_ratio_B is None:
+                M_ratio_B = float(getattr(const, "M_B", 1.0) / getattr(const, "M_SUN", 1.989e30))
 
     # j exponents
     if j_A is None:

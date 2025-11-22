@@ -9,12 +9,13 @@ from .spectral import absorbance_from_genes
 @dataclass
 class LAIParams:
     """Simple LAI prognostic parameters (M2 minimal)."""
-    lai_max: float = 5.0                 # maximum LAI
-    k_canopy: float = 0.5                # Beer-Lambert like coefficient
-    growth_per_j: float = 2.0e-5         # LAI growth per unit "J-equivalent" daily energy
-    senesce_per_day: float = 0.01        # daily senescence under stress
-    stress_thresh: float = 0.3           # soil water index threshold (0..1)
-    stress_strength: float = 1.0         # scaling for senescence when below threshold
+
+    lai_max: float = 5.0  # maximum LAI
+    k_canopy: float = 0.5  # Beer-Lambert like coefficient
+    growth_per_j: float = 2.0e-5  # LAI growth per unit "J-equivalent" daily energy
+    senesce_per_day: float = 0.01  # daily senescence under stress
+    stress_thresh: float = 0.3  # soil water index threshold (0..1)
+    stress_strength: float = 1.0  # scaling for senescence when below threshold
 
     @staticmethod
     def from_env() -> "LAIParams":
@@ -23,6 +24,7 @@ class LAIParams:
                 return float(os.getenv(name, str(default)))
             except Exception:
                 return default
+
         return LAIParams(
             lai_max=f("QD_ECO_LAI_MAX", 5.0),
             k_canopy=f("QD_ECO_LAI_K", 0.5),
@@ -45,8 +47,9 @@ class PopulationManager:
     - Units are normalized proxies (J-equivalents); growth_per_j should be tuned empirically.
     - soil_water_index is expected in [0,1] (0=dry, 1=wet).
     """
+
     def __init__(self, land_mask: np.ndarray, *, diag: bool = True):
-        self.land = (land_mask == 1)
+        self.land = land_mask == 1
         self.shape = land_mask.shape
         self.params = LAIParams.from_env()
         # Initialize LAI: small positive over land
@@ -58,7 +61,9 @@ class PopulationManager:
         # --- M2: canopy cache and recompute policy ---
         self._hours_accum: float = 0.0
         try:
-            self._light_update_every_hours = float(os.getenv("QD_ECO_LIGHT_UPDATE_EVERY_HOURS", "6"))
+            self._light_update_every_hours = float(
+                os.getenv("QD_ECO_LIGHT_UPDATE_EVERY_HOURS", "6")
+            )
         except Exception:
             self._light_update_every_hours = 6.0
         try:
@@ -138,17 +143,23 @@ class PopulationManager:
         except Exception:
             self.spread_rate = 0.0
         try:
-            self.spread_neighbors = os.getenv("QD_ECO_SPREAD_NEIGHBORS", "vonNeumann").strip().lower()
+            self.spread_neighbors = (
+                os.getenv("QD_ECO_SPREAD_NEIGHBORS", "vonNeumann").strip().lower()
+            )
         except Exception:
             self.spread_neighbors = "vonneumann"
 
         # Seed-based dispersal parameters (optional, ties speed to seed investment)
         try:
-            self.spread_mode = os.getenv("QD_ECO_SPREAD_MODE", "diffusion").strip().lower()  # 'diffusion' | 'seed'
+            self.spread_mode = (
+                os.getenv("QD_ECO_SPREAD_MODE", "diffusion").strip().lower()
+            )  # 'diffusion' | 'seed'
         except Exception:
             self.spread_mode = "diffusion"
         try:
-            self.repro_fraction = float(os.getenv("QD_ECO_REPRO_FRACTION", "0.2"))  # fraction of daily energy to reproduction
+            self.repro_fraction = float(
+                os.getenv("QD_ECO_REPRO_FRACTION", "0.2")
+            )  # fraction of daily energy to reproduction
         except Exception:
             self.repro_fraction = 0.2
         try:
@@ -156,11 +167,15 @@ class PopulationManager:
         except Exception:
             self.seed_energy = 1.0
         try:
-            self.seed_scale = float(os.getenv("QD_ECO_SEED_SCALE", "1.0"))   # scaling in r_eff = r0*(1-exp(-seeds/seed_scale))
+            self.seed_scale = float(
+                os.getenv("QD_ECO_SEED_SCALE", "1.0")
+            )  # scaling in r_eff = r0*(1-exp(-seeds/seed_scale))
         except Exception:
             self.seed_scale = 1.0
         try:
-            self.seedling_lai = float(os.getenv("QD_ECO_SEEDLING_LAI", "0.02"))  # LAI boost per established seed unit
+            self.seedling_lai = float(
+                os.getenv("QD_ECO_SEEDLING_LAI", "0.02")
+            )  # LAI boost per established seed unit
         except Exception:
             self.seedling_lai = 0.02
         # Age map (days since establishment); starts at 0, increments daily where LAI>0
@@ -201,7 +216,15 @@ class PopulationManager:
         # RNG
         try:
             seed_val = os.getenv("QD_ECO_RAND_SEED")
-            rng = np.random.default_rng(int(seed_val)) if seed_val not in (None, "",) else np.random.default_rng()
+            rng = (
+                np.random.default_rng(int(seed_val))
+                if seed_val
+                not in (
+                    None,
+                    "",
+                )
+                else np.random.default_rng()
+            )
         except Exception:
             rng = np.random.default_rng()
         # Unspecified indices
@@ -213,7 +236,9 @@ class PopulationManager:
         weights_from_env = bool(getattr(self, "_weights_from_env", False))
         if weights_from_env:
             try:
-                w = np.asarray(getattr(self, "species_weights", np.ones((S,), dtype=float)), dtype=float)
+                w = np.asarray(
+                    getattr(self, "species_weights", np.ones((S,), dtype=float)), dtype=float
+                )
                 w = np.clip(w, 0.0, None)
                 w = w / (np.sum(w) + 1e-12)
                 # Draw one index globally across all species by weights
@@ -249,7 +274,14 @@ class PopulationManager:
                     out.append("diffusion")
         self.species_modes = out
 
-    def step_subdaily(self, isr_total: np.ndarray, dt_seconds: float, *, return_bands: bool = False, soil_ref: float = 0.20) -> np.ndarray | None:
+    def step_subdaily(
+        self,
+        isr_total: np.ndarray,
+        dt_seconds: float,
+        *,
+        return_bands: bool = False,
+        soil_ref: float = 0.20,
+    ) -> np.ndarray | None:
         """
         Accumulate daily energy buffer from incoming shortwave proxy.
         Use simple proportionality: dE = isr_total * dt.
@@ -329,7 +361,7 @@ class PopulationManager:
             Ltot = self.total_LAI()
             for wi in np.atleast_1d(self.species_weights):
                 m = np.full(self.shape, np.nan, dtype=float)
-                m[self.land] = (wi * Ltot[self.land])
+                m[self.land] = wi * Ltot[self.land]
                 maps.append(m)
             return maps
         S = self.Ns
@@ -450,35 +482,43 @@ class PopulationManager:
             LAI_prev_SK = np.maximum(self.LAI_layers_SK, 0.0)  # [S,K,lat,lon]
             LAI_prev_by_k = np.sum(LAI_prev_SK, axis=0)  # [K,lat,lon]
             with np.errstate(invalid="ignore", divide="ignore"):
-                w_s_k = np.where(LAI_prev_by_k[None, :, :, :] > 0.0,
-                                 LAI_prev_SK / (LAI_prev_by_k[None, :, :, :] + 1e-12),
-                                 1.0 / float(self.Ns))
+                w_s_k = np.where(
+                    LAI_prev_by_k[None, :, :, :] > 0.0,
+                    LAI_prev_SK / (LAI_prev_by_k[None, :, :, :] + 1e-12),
+                    1.0 / float(self.Ns),
+                )
             # growth split across layers first by cap_k, then within layer by species share
             with np.errstate(invalid="ignore", divide="ignore"):
                 wcap_k = cap_k / (cap_sum[None, :, :] + 1e-12)  # [K,lat,lon]
-            no_cap = (cap_sum <= 0.0)
+            no_cap = cap_sum <= 0.0
             has_cap = ~no_cap
             # no capture → equal split across K and species
             if np.any(no_cap):
-                eq = (growth_total[no_cap] / float(K) / float(self.Ns))
+                eq = growth_total[no_cap] / float(K) / float(self.Ns)
                 for s in range(self.Ns):
                     for k in range(K):
                         growth_layers_SK[s, k, no_cap] = eq
             if np.any(has_cap):
                 for s in range(self.Ns):
                     for k in range(K):
-                        growth_layers_SK[s, k, has_cap] = w_s_k[s, k, has_cap] * wcap_k[k, has_cap] * growth_total[has_cap]
+                        growth_layers_SK[s, k, has_cap] = (
+                            w_s_k[s, k, has_cap] * wcap_k[k, has_cap] * growth_total[has_cap]
+                        )
 
             # 3) Senescence per species proportional to current LAI share
             LAI_tot_prev = np.sum(LAI_prev_SK, axis=(0, 1))
             with np.errstate(invalid="ignore", divide="ignore"):
-                wsen_s_k = np.where(LAI_tot_prev[None, None, :, :] > 0.0,
-                                    LAI_prev_SK / (LAI_tot_prev[None, None, :, :] + 1e-12),
-                                    1.0 / float(self.Ns * K))
+                wsen_s_k = np.where(
+                    LAI_tot_prev[None, None, :, :] > 0.0,
+                    LAI_prev_SK / (LAI_tot_prev[None, None, :, :] + 1e-12),
+                    1.0 / float(self.Ns * K),
+                )
             sen_layers_SK = wsen_s_k * sen[None, None, :, :]
 
             # 4) Update SK layers and clamp
-            self.LAI_layers_SK = np.clip(LAI_prev_SK + growth_layers_SK - sen_layers_SK, 0.0, P.lai_max)
+            self.LAI_layers_SK = np.clip(
+                LAI_prev_SK + growth_layers_SK - sen_layers_SK, 0.0, P.lai_max
+            )
 
             # 5) Upward transfer species-wise
             try:
@@ -488,7 +528,9 @@ class PopulationManager:
             if upfrac > 0.0:
                 for s in range(self.Ns):
                     for k in range(K - 1, 0, -1):
-                        excess = np.maximum(0.0, self.LAI_layers_SK[s, k, :, :] - self.LAI_layers_SK[s, k - 1, :, :])
+                        excess = np.maximum(
+                            0.0, self.LAI_layers_SK[s, k, :, :] - self.LAI_layers_SK[s, k - 1, :, :]
+                        )
                         delta = upfrac * excess
                         self.LAI_layers_SK[s, k, :, :] -= delta
                         self.LAI_layers_SK[s, k - 1, :, :] += delta
@@ -508,17 +550,25 @@ class PopulationManager:
                 modes = getattr(self, "species_modes", [])
                 any_seed = False
                 for s_idx in range(S):
-                    mode_s = (modes[s_idx] if s_idx < len(modes) else ("seed" if s_idx == 1 else "diffusion"))
+                    mode_s = (
+                        modes[s_idx]
+                        if s_idx < len(modes)
+                        else ("seed" if s_idx == 1 else "diffusion")
+                    )
                     if mode_s == "seed":
                         m = self._seed_based_spread_species(s_idx)
                         if m is not None:
                             any_seed = True
                     else:
-                        self._apply_neighbor_spread_species(s_idx, rate=float(getattr(self, "spread_rate", 0.0)))
+                        self._apply_neighbor_spread_species(
+                            s_idx, rate=float(getattr(self, "spread_rate", 0.0))
+                        )
                 if self._diag and np.random.rand() < 0.05:
                     sdiag = self.summary()
-                    print(f"[Ecology] per-species spread modes: {modes} | r0={self.spread_rate:.3f}/day | "
-                          f"LAI(min/mean/max)={sdiag['LAI_min']:.2f}/{sdiag['LAI_mean']:.2f}/{sdiag['LAI_max']:.2f}")
+                    print(
+                        f"[Ecology] per-species spread modes: {modes} | r0={self.spread_rate:.3f}/day | "
+                        f"LAI(min/mean/max)={sdiag['LAI_min']:.2f}/{sdiag['LAI_mean']:.2f}/{sdiag['LAI_max']:.2f}"
+                    )
                 if any_seed:
                     # Mark seeded today at cell-level for age reset below
                     # (approximation: where any species seeded)
@@ -568,7 +618,9 @@ class PopulationManager:
         if getattr(self, "LAI_layers_SK", None) is not None:
             try:
                 S = int(getattr(self, "Ns", 1))
-                w = np.asarray(getattr(self, "species_weights", np.ones((S,), dtype=float)), dtype=float)
+                w = np.asarray(
+                    getattr(self, "species_weights", np.ones((S,), dtype=float)), dtype=float
+                )
                 w = w / (np.sum(w) + 1e-12)
             except Exception:
                 S = 1
@@ -577,14 +629,15 @@ class PopulationManager:
             for s in range(S):
                 add_s = w[s] * add_total
                 self.LAI_layers_SK[s, 0, self.land] = np.clip(
-                    self.LAI_layers_SK[s, 0, self.land] + add_s[self.land],
-                    0.0, self.params.lai_max
+                    self.LAI_layers_SK[s, 0, self.land] + add_s[self.land], 0.0, self.params.lai_max
                 )
             # refresh aggregates
             self.LAI_layers = np.sum(self.LAI_layers_SK, axis=0)
             self.LAI = np.sum(self.LAI_layers, axis=0)
         else:
-            self.LAI[self.land] = np.clip(self.LAI[self.land] + s_lai * seeds_to_germ[self.land], 0.0, self.params.lai_max)
+            self.LAI[self.land] = np.clip(
+                self.LAI[self.land] + s_lai * seeds_to_germ[self.land], 0.0, self.params.lai_max
+            )
         # Seed bank decay after germination
         try:
             self.seed_bank = np.maximum(0.0, self.seed_bank - seeds_to_germ)
@@ -613,11 +666,9 @@ class PopulationManager:
         land = self.land
         neigh_mode = str(getattr(self, "spread_neighbors", "vonneumann")).lower()
         if neigh_mode in ("moore", "8", "8n"):
-            offsets = [(-1,-1), (-1,0), (-1,1),
-                       ( 0,-1),          ( 0,1),
-                       ( 1,-1), ( 1,0),  ( 1,1)]
+            offsets = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
         else:
-            offsets = [(-1,0), (0,-1), (0,1), (1,0)]
+            offsets = [(-1, 0), (0, -1), (0, 1), (1, 0)]
 
         if s_idx is None or getattr(self, "LAI_layers_SK", None) is None:
             # total-LAI path
@@ -653,7 +704,9 @@ class PopulationManager:
                 LAI_tot_prev = np.maximum(np.sum(self.LAI_layers_SK, axis=(0, 1)), 0.0)
                 with np.errstate(invalid="ignore", divide="ignore"):
                     factor = np.where(LAI_tot_prev > 0.0, LAI_new / (LAI_tot_prev + 1e-12), 0.0)
-                self.LAI_layers_SK = np.clip(self.LAI_layers_SK * factor[None, None, :, :], 0.0, self.params.lai_max)
+                self.LAI_layers_SK = np.clip(
+                    self.LAI_layers_SK * factor[None, None, :, :], 0.0, self.params.lai_max
+                )
                 self.LAI_layers = np.sum(self.LAI_layers_SK, axis=0)
                 self.LAI = np.sum(self.LAI_layers, axis=0)
             else:
@@ -694,7 +747,9 @@ class PopulationManager:
         with np.errstate(invalid="ignore", divide="ignore"):
             factor = np.where(LAI_s_prev > 0.0, LAI_s_new / (LAI_s_prev + 1e-12), 0.0)
         # scale only species s layers
-        self.LAI_layers_SK[s, :, :, :] = np.clip(self.LAI_layers_SK[s, :, :, :] * factor[None, :, :], 0.0, self.params.lai_max)
+        self.LAI_layers_SK[s, :, :, :] = np.clip(
+            self.LAI_layers_SK[s, :, :, :] * factor[None, :, :], 0.0, self.params.lai_max
+        )
         # refresh aggregates
         self.LAI_layers = np.sum(self.LAI_layers_SK, axis=0)
         self.LAI = np.sum(self.LAI_layers, axis=0)
@@ -726,11 +781,9 @@ class PopulationManager:
         # Neighbor set
         neigh_mode = str(getattr(self, "spread_neighbors", "vonneumann")).lower()
         if neigh_mode in ("moore", "8", "8n"):
-            offsets = [(-1,-1), (-1,0), (-1,1),
-                       ( 0,-1),          ( 0,1),
-                       ( 1,-1), ( 1,0),  ( 1,1)]
+            offsets = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
         else:
-            offsets = [(-1,0), (0,-1), (0,1), (1,0)]
+            offsets = [(-1, 0), (0, -1), (0, 1), (1, 0)]
 
         # If per-species
         if s_idx is not None and getattr(self, "LAI_layers_SK", None) is not None:
@@ -797,7 +850,8 @@ class PopulationManager:
                 # Inject seedlings to species s at lowest layer
                 self.LAI_layers_SK[s_idx, 0, seeded_mask] = np.clip(
                     self.LAI_layers_SK[s_idx, 0, seeded_mask] + add[seeded_mask],
-                    0.0, self.params.lai_max
+                    0.0,
+                    self.params.lai_max,
                 )
                 self.LAI_layers = np.sum(self.LAI_layers_SK, axis=0)
                 self.LAI = np.sum(self.LAI_layers, axis=0)
@@ -814,12 +868,15 @@ class PopulationManager:
                     for s in range(S):
                         self.LAI_layers_SK[s, 0, seeded_mask] = np.clip(
                             self.LAI_layers_SK[s, 0, seeded_mask] + w[s] * add[seeded_mask],
-                            0.0, self.params.lai_max
+                            0.0,
+                            self.params.lai_max,
                         )
                     self.LAI_layers = np.sum(self.LAI_layers_SK, axis=0)
                     self.LAI = np.sum(self.LAI_layers, axis=0)
                 else:
-                    self.LAI[seeded_mask] = np.clip(self.LAI[seeded_mask] + add[seeded_mask], 0.0, self.params.lai_max)
+                    self.LAI[seeded_mask] = np.clip(
+                        self.LAI[seeded_mask] + add[seeded_mask], 0.0, self.params.lai_max
+                    )
             # Reset age to 0 at newly seeded cells
             try:
                 self.age_days[seeded_mask] = 0.0
@@ -927,10 +984,17 @@ class PopulationManager:
         """
         try:
             peaks = getattr(genes, "absorption_peaks", []) or []
-            pk_key = tuple((float(getattr(p, "center_nm", 0.0)),
-                            float(getattr(p, "width_nm", 0.0)),
-                            float(getattr(p, "height", 0.0))) for p in peaks)
-            lam_key = tuple(float(x) for x in np.asarray(bands.lambda_centers, dtype=float).ravel().tolist())
+            pk_key = tuple(
+                (
+                    float(getattr(p, "center_nm", 0.0)),
+                    float(getattr(p, "width_nm", 0.0)),
+                    float(getattr(p, "height", 0.0)),
+                )
+                for p in peaks
+            )
+            lam_key = tuple(
+                float(x) for x in np.asarray(bands.lambda_centers, dtype=float).ravel().tolist()
+            )
             key = f"{getattr(genes, 'identity', 'gene')}|{pk_key}|{lam_key}"
         except Exception:
             key = f"{id(genes)}|{getattr(bands, 'nbands', 0)}"

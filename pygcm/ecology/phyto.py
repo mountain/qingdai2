@@ -21,18 +21,18 @@ from .spectral import (
 @dataclass
 class PhytoParams:
     # Growth parameters (daily model; can be overridden per-species via env arrays)
-    mu_max: float = 1.5              # d^-1 maximum potential growth
-    alpha_P: float = 0.04            # 1/(W m^-2) light utilization coefficient
-    Q10: float = 2.0                 # temperature sensitivity
-    T_ref: float = 293.15            # K (20°C) reference
-    m0: float = 0.05                 # d^-1 background loss (respiration/mortality)
+    mu_max: float = 1.5  # d^-1 maximum potential growth
+    alpha_P: float = 0.04  # 1/(W m^-2) light utilization coefficient
+    Q10: float = 2.0  # temperature sensitivity
+    T_ref: float = 293.15  # K (20°C) reference
+    m0: float = 0.05  # d^-1 background loss (respiration/mortality)
     lambda_sink_m_per_day: float = 0.0  # m/day equivalent sinking (0 for M1)
 
     # Optics
-    kd_exp_m: float = 0.5            # exponent in Kd ~ Chl^m
+    kd_exp_m: float = 0.5  # exponent in Kd ~ Chl^m
 
     # Initialization
-    chl0: float = 0.05               # mg/m^3 initial mixed-layer chlorophyll (total)
+    chl0: float = 0.05  # mg/m^3 initial mixed-layer chlorophyll (total)
 
 
 def _read_env_float(name: str, default: float) -> float:
@@ -91,6 +91,7 @@ class PhytoManager:
         where Shape_s[b] is a Gaussian (center mu_s, width sigma_s) normalized over bands.
       - Scalar α_water_eff by band weights (Rayleigh/simple)
     """
+
     def __init__(
         self,
         grid,
@@ -100,8 +101,8 @@ class PhytoManager:
         diag: bool = True,
     ) -> None:
         self.grid = grid
-        self.land_mask = (land_mask.astype(int))
-        self.ocean_mask = (self.land_mask == 0)
+        self.land_mask = land_mask.astype(int)
+        self.ocean_mask = self.land_mask == 0
         self.NL, self.NM = self.grid.n_lat, self.grid.n_lon
         # Grid metrics for transport (spherical geometry)
         self.a = getattr(self.grid, "a", None)
@@ -109,6 +110,7 @@ class PhytoManager:
             # Planet radius from constants if grid doesn't carry it
             try:
                 from .. import constants as _const
+
                 self.a = _const.PLANET_RADIUS
             except Exception:
                 self.a = 6.371e6
@@ -158,9 +160,9 @@ class PhytoManager:
         self.S = max(1, S_default)
 
         # Optical base parameters per band (Kd and pure water reflectance)
-        kd0_list = _read_env_list("QD_PHYTO_KD0")          # optional CSV length NB
-        kchl_list = _read_env_list("QD_PHYTO_KD_CHL")      # optional CSV length NB
-        Apure_list = _read_env_list("QD_PHYTO_APURE")      # optional CSV length NB
+        kd0_list = _read_env_list("QD_PHYTO_KD0")  # optional CSV length NB
+        kchl_list = _read_env_list("QD_PHYTO_KD_CHL")  # optional CSV length NB
+        Apure_list = _read_env_list("QD_PHYTO_APURE")  # optional CSV length NB
 
         kd0_default = _read_env_float("QD_PHYTO_KD0_DEFAULT", 0.04)
         kchl_default = _read_env_float("QD_PHYTO_KD_CHL_DEFAULT", 0.02)
@@ -198,14 +200,16 @@ class PhytoManager:
         p_reflect_default = _read_env_float("QD_PHYTO_REFLECT_P", 0.5)
 
         # Initialize per-species arrays
-        self.shape_sb = np.zeros((self.S, NB), dtype=float)     # [S, NB]
-        self.c_reflect_s = np.zeros((self.S,), dtype=float)      # [S]
-        self.p_reflect_s = np.zeros((self.S,), dtype=float)      # [S]
+        self.shape_sb = np.zeros((self.S, NB), dtype=float)  # [S, NB]
+        self.c_reflect_s = np.zeros((self.S,), dtype=float)  # [S]
+        self.p_reflect_s = np.zeros((self.S,), dtype=float)  # [S]
         for s in range(self.S):
-            mu_s = mu_arr[s] if s < len(mu_arr) else float(mu_defaults[min(s, len(mu_defaults)-1)])
+            mu_s = (
+                mu_arr[s] if s < len(mu_arr) else float(mu_defaults[min(s, len(mu_defaults) - 1)])
+            )
             sigma_s = sigma_arr[s] if s < len(sigma_arr) else sigma_default
             # Gaussian shape and normalize over bands
-            g = np.exp(-((lam - mu_s) ** 2) / (2.0 * sigma_s ** 2))
+            g = np.exp(-((lam - mu_s) ** 2) / (2.0 * sigma_s**2))
             gsum = float(np.sum(g)) + 1e-12
             self.shape_sb[s, :] = g / gsum
             # Reflectance controls
@@ -224,25 +228,22 @@ class PhytoManager:
         m0_arr = _read_env_list("QD_PHYTO_SPEC_M0") or []
         self.mu_max_s = np.array(
             [(mu_max_arr[s] if s < len(mu_max_arr) else self.params.mu_max) for s in range(self.S)],
-            dtype=float
+            dtype=float,
         )
         self.m0_s = np.array(
-            [(m0_arr[s] if s < len(m0_arr) else self.params.m0) for s in range(self.S)],
-            dtype=float
+            [(m0_arr[s] if s < len(m0_arr) else self.params.m0) for s in range(self.S)], dtype=float
         )
 
         # --- Nutrient competition (optional, single N pool) ---
         self.enable_N = int(os.getenv("QD_PHYTO_ENABLE_N", "1")) == 1
         # Per-species half-saturation (mmol m^-3) and yield (mg Chl per mmol N)
         KN_list = _read_env_list("QD_PHYTO_KN") or []
-        Y_list  = _read_env_list("QD_PHYTO_YIELD") or []
+        Y_list = _read_env_list("QD_PHYTO_YIELD") or []
         self.KN_s = np.array(
-            [(KN_list[s] if s < len(KN_list) else 0.5) for s in range(self.S)],
-            dtype=float
+            [(KN_list[s] if s < len(KN_list) else 0.5) for s in range(self.S)], dtype=float
         )
         self.Y_s = np.array(
-            [(Y_list[s] if s < len(Y_list) else 1.0) for s in range(self.S)],
-            dtype=float
+            [(Y_list[s] if s < len(Y_list) else 1.0) for s in range(self.S)], dtype=float
         )
         # Remineralization source (mmol m^-3 d^-1) and initial N
         self.R_remin = _read_env_float("QD_PHYTO_REMIN", 0.01)
@@ -253,7 +254,7 @@ class PhytoManager:
         # Species initial fractions (sum to 1); if not provided, equal split
         frac_arr = _read_env_list("QD_PHYTO_INIT_FRAC") or []
         if len(frac_arr) >= self.S:
-            frac = np.clip(np.array(frac_arr[:self.S], dtype=float), 0.0, None)
+            frac = np.clip(np.array(frac_arr[: self.S], dtype=float), 0.0, None)
             s = float(np.sum(frac))
             frac = frac / s if s > 0 else np.full((self.S,), 1.0 / self.S, dtype=float)
         else:
@@ -277,7 +278,9 @@ class PhytoManager:
 
         if self.diag:
             spec_info = f"S={self.S}, mu={self.mu_max_s.min():.2f}..{self.mu_max_s.max():.2f}/d"
-            print(f"[Phyto] NB={NB} bands, H_mld={self.H_mld:.1f} m | {spec_info} | alpha_P={self.params.alpha_P:.3f} | m0={self.params.m0:.3f} d^-1 | Q10={self.params.Q10:.2f}")
+            print(
+                f"[Phyto] NB={NB} bands, H_mld={self.H_mld:.1f} m | {spec_info} | alpha_P={self.params.alpha_P:.3f} | m0={self.params.m0:.3f} d^-1 | Q10={self.params.Q10:.2f}"
+            )
 
     # ---------- Core optics helpers ----------
 
@@ -305,7 +308,7 @@ class PhytoManager:
         x = Kd_b * H
         # Safe factor (1 - e^-x)/x with series fallback for small x
         small = x < 1e-6
-        factor_small = 1.0 - 0.5 * x + (x ** 2) / 6.0
+        factor_small = 1.0 - 0.5 * x + (x**2) / 6.0
         factor_big = (1.0 - np.exp(-x)) / np.clip(x, 1e-12, None)
         factor = np.where(small, factor_small, factor_big)
         # Non-negative
@@ -362,7 +365,9 @@ class PhytoManager:
         except Exception:
             dlam = None
         if dlam is not None and dlam.size == self.bands.nbands:
-            E_s = np.tensordot(self.shape_sb, Ibar_b * dlam[:, None, None], axes=(1, 0))  # [S, NL, NM]
+            E_s = np.tensordot(
+                self.shape_sb, Ibar_b * dlam[:, None, None], axes=(1, 0)
+            )  # [S, NL, NM]
         else:
             E_s = np.tensordot(self.shape_sb, Ibar_b, axes=(1, 0))  # [S, NL, NM]
 
@@ -381,7 +386,9 @@ class PhytoManager:
             KN = np.maximum(self.KN_s[:, None, None], 1e-12)  # [S,1,1]
             Nmap = np.asarray(self.N, dtype=float)[None, :, :]  # [1,NL,NM]
             fN_s = Nmap / (KN + Nmap)  # [S,NL,NM] in [0,1]
-            mu_grow_s = self.mu_max_s[:, None, None] * muL_s * fT[None, :, :] * np.clip(fN_s, 0.0, 1.0)
+            mu_grow_s = (
+                self.mu_max_s[:, None, None] * muL_s * fT[None, :, :] * np.clip(fN_s, 0.0, 1.0)
+            )
         else:
             mu_grow_s = self.mu_max_s[:, None, None] * muL_s * fT[None, :, :]
 
@@ -400,7 +407,7 @@ class PhytoManager:
             # Uptake = μ_grow · C / Y  (mmol m^-3 d^-1)
             uptake = (mu_grow_s * self.C_phyto_s) / Y
             total_uptake = np.sum(uptake, axis=0)  # [NL,NM]
-            dN = (- total_uptake + float(self.R_remin)) * float(dt_days)
+            dN = (-total_uptake + float(self.R_remin)) * float(dt_days)
             self.N = np.clip(np.asarray(self.N, dtype=float) + dN, 0.0, np.inf)
             self.N[~self.ocean_mask] = 0.0
 
@@ -463,11 +470,13 @@ class PhytoManager:
         F = np.nan_to_num(F, copy=False)
         dF_dphi = np.gradient(F, self.dlat, axis=0)
         term_phi = (1.0 / self.coslat) * np.gradient(self.coslat * dF_dphi, self.dlat, axis=0)
-        d2F_dlam2 = (np.roll(F, -1, axis=1) - 2.0 * F + np.roll(F, 1, axis=1)) / (self.dlon ** 2)
-        term_lam = d2F_dlam2 / (self.coslat ** 2)
-        return (term_phi + term_lam) / (self.a ** 2)
+        d2F_dlam2 = (np.roll(F, -1, axis=1) - 2.0 * F + np.roll(F, 1, axis=1)) / (self.dlon**2)
+        term_lam = d2F_dlam2 / (self.coslat**2)
+        return (term_phi + term_lam) / (self.a**2)
 
-    def _advect_scalar(self, field: np.ndarray, u: np.ndarray, v: np.ndarray, dt: float) -> np.ndarray:
+    def _advect_scalar(
+        self, field: np.ndarray, u: np.ndarray, v: np.ndarray, dt: float
+    ) -> np.ndarray:
         """
         Semi-Lagrangian advection (bilinear interpolation, lon periodic).
         Uses JAX kernel if available, falls back to scipy.ndimage.map_coordinates.
@@ -480,8 +489,9 @@ class PhytoManager:
             pass
 
         from scipy.ndimage import map_coordinates
-        dlam = u * dt / (self.a * self.coslat)   # radians of longitude
-        dphi = v * dt / self.a                   # radians of latitude
+
+        dlam = u * dt / (self.a * self.coslat)  # radians of longitude
+        dphi = v * dt / self.a  # radians of latitude
 
         dx = dlam / self.dlon
         dy = dphi / self.dlat
@@ -507,7 +517,7 @@ class PhytoManager:
         if dt_seconds <= 0.0:
             return
         S = int(self.S)
-        ocean_mask = (self.land_mask == 0)
+        ocean_mask = self.land_mask == 0
 
         for s in range(S):
             C = np.asarray(self.C_phyto_s[s, :, :], dtype=float)
@@ -579,7 +589,9 @@ class PhytoManager:
                 N=np.asarray(self.N, dtype=np.float32),
             )
             if self.diag:
-                print(f"[Phyto] Autosave written: '{path_npz}' (S={self.S}, NL={self.NL}, NM={self.NM})")
+                print(
+                    f"[Phyto] Autosave written: '{path_npz}' (S={self.S}, NL={self.NL}, NM={self.NM})"
+                )
             return True
         except Exception as e:
             if self.diag:
@@ -613,7 +625,9 @@ class PhytoManager:
 
         if (S != self.S) or (NL != self.NL) or (NM != self.NM) or C_saved is None:
             if self.diag:
-                print(f"[Phyto] Autosave shape mismatch (saved S={S},NL={NL},NM={NM}; current S={self.S},NL={self.NL},NM={self.NM}).")
+                print(
+                    f"[Phyto] Autosave shape mismatch (saved S={S},NL={NL},NM={NM}; current S={self.S},NL={self.NL},NM={self.NM})."
+                )
             if on_mismatch == "random":
                 self.randomize_state(seed=None)
                 return True
@@ -694,6 +708,7 @@ class PhytoManager:
         """
         try:
             import json as _json
+
             os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
             doc = {
                 "schema_version": 1,
@@ -701,8 +716,13 @@ class PhytoManager:
                 "day": float(day_value) if day_value is not None else None,
                 "bands": {
                     "nbands": int(self.bands.nbands),
-                    "lambda_centers_nm": [float(x) for x in np.asarray(self.bands.lambda_centers, dtype=float).tolist()],
-                    "delta_lambda_nm": [float(x) for x in np.asarray(self.bands.delta_lambda, dtype=float).tolist()],
+                    "lambda_centers_nm": [
+                        float(x)
+                        for x in np.asarray(self.bands.lambda_centers, dtype=float).tolist()
+                    ],
+                    "delta_lambda_nm": [
+                        float(x) for x in np.asarray(self.bands.delta_lambda, dtype=float).tolist()
+                    ],
                 },
                 "params": {
                     "alpha_P": float(self.params.alpha_P),
@@ -713,8 +733,12 @@ class PhytoManager:
                 "species": {
                     "mu_max_s": [float(x) for x in np.asarray(self.mu_max_s, dtype=float).tolist()],
                     "m0_s": [float(x) for x in np.asarray(self.m0_s, dtype=float).tolist()],
-                    "c_reflect_s": [float(x) for x in np.asarray(self.c_reflect_s, dtype=float).tolist()],
-                    "p_reflect_s": [float(x) for x in np.asarray(self.p_reflect_s, dtype=float).tolist()],
+                    "c_reflect_s": [
+                        float(x) for x in np.asarray(self.c_reflect_s, dtype=float).tolist()
+                    ],
+                    "p_reflect_s": [
+                        float(x) for x in np.asarray(self.p_reflect_s, dtype=float).tolist()
+                    ],
                     # Store per-species spectral shapes (Gaussian weights per band, normalized)
                     "shape_sb": np.asarray(self.shape_sb, dtype=float).tolist(),
                 },
@@ -727,7 +751,9 @@ class PhytoManager:
             with open(path, "w", encoding="utf-8") as f:
                 _json.dump(doc, f, ensure_ascii=False, indent=2)
             if self.diag:
-                print(f"[Phyto] Bio/optics JSON written: '{path}' (S={self.S}, NB={self.bands.nbands})")
+                print(
+                    f"[Phyto] Bio/optics JSON written: '{path}' (S={self.S}, NB={self.bands.nbands})"
+                )
             return True
         except Exception as e:
             if self.diag:
@@ -747,6 +773,7 @@ class PhytoManager:
         """
         try:
             from netCDF4 import Dataset
+
             os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
             with Dataset(path, "w") as ds:
                 NL, NM = self.NL, self.NM
@@ -811,6 +838,7 @@ class PhytoManager:
         """
         try:
             import json as _json
+
             with open(path, "r", encoding="utf-8") as f:
                 doc = _json.load(f)
         except Exception as e:
@@ -825,11 +853,12 @@ class PhytoManager:
             dlam = np.asarray(bands_json.get("delta_lambda_nm", []), dtype=float)
 
             # Decide bands handling
-            replace_bands = (on_mismatch == "replace" and nb_json > 0 and lam_cent.size == nb_json)
+            replace_bands = on_mismatch == "replace" and nb_json > 0 and lam_cent.size == nb_json
             if replace_bands:
                 # Rebuild SpectralBands using JSON band definition
                 try:
                     from .spectral import SpectralBands
+
                     lam_edges = None
                     if dlam.size == nb_json:
                         # Derive edges from centers and delta if possible (approx)
@@ -837,13 +866,13 @@ class PhytoManager:
                         lam_edges = np.zeros((nb_json + 1,), dtype=float)
                         lam_edges[0] = lam_cent[0] - half[0]
                         for i in range(1, nb_json):
-                            lam_edges[i] = 0.5 * (lam_cent[i-1] + lam_cent[i])
+                            lam_edges[i] = 0.5 * (lam_cent[i - 1] + lam_cent[i])
                         lam_edges[-1] = lam_cent[-1] + half[-1]
                     self.bands = SpectralBands(
                         nbands=nb_json,
                         lambda_centers=lam_cent if lam_cent.size == nb_json else None,
                         delta_lambda=dlam if dlam.size == nb_json else None,
-                        lambda_edges=lam_edges
+                        lambda_edges=lam_edges,
                     )
                     if self.diag:
                         print(f"[Phyto] Bands replaced from JSON: NB={self.bands.nbands}")
@@ -856,7 +885,9 @@ class PhytoManager:
             self.params.alpha_P = float(p.get("alpha_P", self.params.alpha_P))
             self.params.Q10 = float(p.get("Q10", self.params.Q10))
             self.params.T_ref = float(p.get("T_ref", self.params.T_ref))
-            self.params.lambda_sink_m_per_day = float(p.get("lambda_sink_m_per_day", self.params.lambda_sink_m_per_day))
+            self.params.lambda_sink_m_per_day = float(
+                p.get("lambda_sink_m_per_day", self.params.lambda_sink_m_per_day)
+            )
 
             # Update species arrays
             sp = doc.get("species", {}) or {}
@@ -875,21 +906,28 @@ class PhytoManager:
 
             changed_any = False
             if mu_max_s.size > 0:
-                self.mu_max_s = mu_max_s.astype(float); changed_any = True
+                self.mu_max_s = mu_max_s.astype(float)
+                changed_any = True
             if m0_s.size > 0:
-                self.m0_s = m0_s.astype(float); changed_any = True
+                self.m0_s = m0_s.astype(float)
+                changed_any = True
             if c_reflect_s.size > 0:
-                self.c_reflect_s = c_reflect_s.astype(float); changed_any = True
+                self.c_reflect_s = c_reflect_s.astype(float)
+                changed_any = True
             if p_reflect_s.size > 0:
-                self.p_reflect_s = p_reflect_s.astype(float); changed_any = True
+                self.p_reflect_s = p_reflect_s.astype(float)
+                changed_any = True
             # Update S from arrays length if consistent
-            S_new = max(self.S,
-                        self.mu_max_s.size,
-                        self.m0_s.size,
-                        self.c_reflect_s.size,
-                        self.p_reflect_s.size)
+            S_new = max(
+                self.S,
+                self.mu_max_s.size,
+                self.m0_s.size,
+                self.c_reflect_s.size,
+                self.p_reflect_s.size,
+            )
             if S_new != self.S:
                 self.S = int(S_new)
+
                 # Ensure arrays length match S
                 def _ensure_len(a, val=1.0):
                     if a.size == self.S:
@@ -899,7 +937,8 @@ class PhytoManager:
                     if a.size < self.S:
                         pad = np.full((self.S - a.size,), a[-1] if a.size > 0 else val, dtype=float)
                         return np.concatenate([a, pad], axis=0)
-                    return a[:self.S]
+                    return a[: self.S]
+
                 self.mu_max_s = _ensure_len(self.mu_max_s, self.params.mu_max)
                 self.m0_s = _ensure_len(self.m0_s, self.params.m0)
                 self.c_reflect_s = _ensure_len(self.c_reflect_s, 0.02)
@@ -912,7 +951,11 @@ class PhytoManager:
                         v = shape_sb[s, :]
                         if v.size == NB:
                             shp[s, :] = v / (float(np.sum(v)) + 1e-12)
-                self.shape_sb = np.where(shp > 0, shp, self.shape_sb if getattr(self, "shape_sb", None) is not None else shp)
+                self.shape_sb = np.where(
+                    shp > 0,
+                    shp,
+                    self.shape_sb if getattr(self, "shape_sb", None) is not None else shp,
+                )
 
             # Optics Kd and Apure per band
             opt = doc.get("optics", {}) or {}
@@ -929,10 +972,13 @@ class PhytoManager:
 
             # Recompute band weights with current bands
             from .spectral import band_weights_from_mode
+
             self.w_b = band_weights_from_mode(self.bands)
 
             if self.diag:
-                print(f"[Phyto] Bio/optics JSON loaded: S={self.S}, NB={self.bands.nbands} (bands {'replaced' if replace_bands else 'kept'})")
+                print(
+                    f"[Phyto] Bio/optics JSON loaded: S={self.S}, NB={self.bands.nbands} (bands {'replaced' if replace_bands else 'kept'})"
+                )
             return True
         except Exception as e:
             if self.diag:
@@ -947,10 +993,19 @@ class PhytoManager:
         """
         try:
             from netCDF4 import Dataset
+
             with Dataset(path, "r") as ds:
                 C = np.asarray(ds.variables["C_phyto_s"]) if "C_phyto_s" in ds.variables else None
-                ab = np.asarray(ds.variables["alpha_water_bands"]) if "alpha_water_bands" in ds.variables else None
-                aS = np.asarray(ds.variables["alpha_water_scalar"]) if "alpha_water_scalar" in ds.variables else None
+                ab = (
+                    np.asarray(ds.variables["alpha_water_bands"])
+                    if "alpha_water_bands" in ds.variables
+                    else None
+                )
+                aS = (
+                    np.asarray(ds.variables["alpha_water_scalar"])
+                    if "alpha_water_scalar" in ds.variables
+                    else None
+                )
                 kd = np.asarray(ds.variables["Kd_490"]) if "Kd_490" in ds.variables else None
                 # Optional: bands check
                 try:
@@ -968,8 +1023,10 @@ class PhytoManager:
         try:
             NL, NM = self.NL, self.NM
             NB = self.bands.nbands
-            okC = (C is not None and C.ndim == 3 and C.shape[1] == NL and C.shape[2] == NM)
-            okAb = (ab is None) or (ab.ndim == 3 and ab.shape[1] == NL and ab.shape[2] == NM and ab.shape[0] == NB)
+            okC = C is not None and C.ndim == 3 and C.shape[1] == NL and C.shape[2] == NM
+            okAb = (ab is None) or (
+                ab.ndim == 3 and ab.shape[1] == NL and ab.shape[2] == NM and ab.shape[0] == NB
+            )
             okAS = (aS is None) or (aS.shape == (NL, NM))
             okKd = (kd is None) or (kd.shape == (NL, NM))
             if not okC or not okAb or not okAS or not okKd:
@@ -985,14 +1042,20 @@ class PhytoManager:
             for s in range(self.S):
                 self.C_phyto_s[s, ~self.ocean_mask] = 0.0
             if ab is not None:
-                self.alpha_water_bands = np.clip(ab.astype(float), self.alpha_clip_min, self.alpha_clip_max)
+                self.alpha_water_bands = np.clip(
+                    ab.astype(float), self.alpha_clip_min, self.alpha_clip_max
+                )
             if aS is not None:
-                self.alpha_water_scalar = np.clip(aS.astype(float), self.alpha_clip_min, self.alpha_clip_max)
+                self.alpha_water_scalar = np.clip(
+                    aS.astype(float), self.alpha_clip_min, self.alpha_clip_max
+                )
             if kd is not None:
                 self.Kd_490 = np.clip(kd.astype(float), 0.0, np.inf)
             if self.diag:
-                print(f"[Phyto] plankton.nc loaded: C_phyto_s[{self.C_phyto_s.shape}], "
-                      f"alpha_bands={'OK' if ab is not None else 'none'}, alpha_scalar={'OK' if aS is not None else 'none'}")
+                print(
+                    f"[Phyto] plankton.nc loaded: C_phyto_s[{self.C_phyto_s.shape}], "
+                    f"alpha_bands={'OK' if ab is not None else 'none'}, alpha_scalar={'OK' if aS is not None else 'none'}"
+                )
             return True
         except Exception as e:
             if self.diag:

@@ -11,11 +11,12 @@ Provides:
 - to_numpy: safe conversion from device arrays to numpy
 - is_enabled: query flag
 """
+
 from __future__ import annotations
 
 import os
+
 import numpy as _np
-from typing import Tuple
 
 # Global flag — do not raise if JAX unavailable; just fall back to NumPy/SciPy
 _JAX_ENABLED = False
@@ -34,6 +35,7 @@ if _JAX_ENABLED:
         import jax as _JAX
         import jax.numpy as _JNP
         import jax.scipy.ndimage as _JAX_SCIPY_NDIMAGE
+
         # Optional: select platform (cpu|gpu|tpu|metal)
         plat_env = os.getenv("QD_JAX_PLATFORM")
         if plat_env:
@@ -64,10 +66,7 @@ if _JAX_ENABLED:
 
 
 # Public array module: jax.numpy if enabled on accelerator, else numpy.
-if _JAX_ENABLED and (_JNP is not None):
-    xp = _JNP
-else:
-    xp = _np
+xp = _JNP if _JAX_ENABLED and _JNP is not None else _np
 
 
 def is_enabled() -> bool:
@@ -110,10 +109,12 @@ def jax_map_coordinates(arr, coords, order: int = 1, mode: str = "wrap", prefilt
         return _JAX_SCIPY_NDIMAGE.map_coordinates(arr, coords, order=order, mode=mode)
     else:
         from scipy.ndimage import map_coordinates as _sc_map
+
         return _sc_map(arr, coords, order=order, mode=mode, prefilter=prefilter)
 
 
 # ---------------- JAX-jitted kernels (with NumPy fallbacks) ---------------- #
+
 
 def laplacian_sphere(F, dlat: float, dlon: float, coslat, a: float):
     """
@@ -121,22 +122,26 @@ def laplacian_sphere(F, dlat: float, dlon: float, coslat, a: float):
     If JAX enabled: jitted; else NumPy implementation.
     """
     if _JAX_ENABLED:
-        @ _JAX.jit
+
+        @_JAX.jit
         def _lap(F_, coslat_):
             F_ = _JNP.nan_to_num(F_)
             dF_dphi = _JNP.gradient(F_, dlat, axis=0)
             term_phi = (1.0 / coslat_) * _JNP.gradient(coslat_ * dF_dphi, dlat, axis=0)
-            d2F_dlam2 = (_JNP.roll(F_, -1, axis=1) - 2.0 * F_ + _JNP.roll(F_, 1, axis=1)) / (dlon ** 2)
-            term_lam = d2F_dlam2 / (coslat_ ** 2)
-            return (term_phi + term_lam) / (a ** 2)
+            d2F_dlam2 = (_JNP.roll(F_, -1, axis=1) - 2.0 * F_ + _JNP.roll(F_, 1, axis=1)) / (
+                dlon**2
+            )
+            term_lam = d2F_dlam2 / (coslat_**2)
+            return (term_phi + term_lam) / (a**2)
+
         return _lap(F, coslat)
     else:
         F = _np.nan_to_num(F)
         dF_dphi = _np.gradient(F, dlat, axis=0)
         term_phi = (1.0 / coslat) * _np.gradient(coslat * dF_dphi, dlat, axis=0)
-        d2F_dlam2 = (_np.roll(F, -1, axis=1) - 2.0 * F + _np.roll(F, 1, axis=1)) / (dlon ** 2)
-        term_lam = d2F_dlam2 / (coslat ** 2)
-        return (term_phi + term_lam) / (a ** 2)
+        d2F_dlam2 = (_np.roll(F, -1, axis=1) - 2.0 * F + _np.roll(F, 1, axis=1)) / (dlon**2)
+        term_lam = d2F_dlam2 / (coslat**2)
+        return (term_phi + term_lam) / (a**2)
 
 
 def hyperdiffuse(F, k4, dt: float, n_substeps: int, dlat: float, dlon: float, coslat, a: float):
@@ -154,22 +159,25 @@ def hyperdiffuse(F, k4, dt: float, n_substeps: int, dlat: float, dlon: float, co
         except Exception:
             k4_is_scalar = False
 
-        @ _JAX.jit
+        @_JAX.jit
         def _step_once(F_, k4_):
             L = laplacian_sphere(F_, dlat, dlon, coslat, a)
             L2 = laplacian_sphere(L, dlat, dlon, coslat, a)
             return F_ - k4_ * L2 * (dt / _JNP.maximum(1, n_substeps))
 
-        @ _JAX.jit
+        @_JAX.jit
         def _loop(F_):
             sub_dt = dt / _JNP.maximum(1, n_substeps)
             # Allow scalar or array k4
             k4_ = _JNP.array(k4) if not k4_is_scalar else _JNP.array(float(k4))
+
             def body(i, val):
                 L = laplacian_sphere(val, dlat, dlon, coslat, a)
                 L2 = laplacian_sphere(L, dlat, dlon, coslat, a)
                 return val - k4_ * L2 * sub_dt
+
             return _JAX.lax.fori_loop(0, _JNP.maximum(1, n_substeps), body, _JNP.nan_to_num(F_))
+
         return _loop(F)
     else:
         # NumPy fallback
@@ -220,4 +228,5 @@ def advect_semilag(field, u, v, dt: float, a: float, dlat: float, dlon: float, c
         return _JAX_SCIPY_NDIMAGE.map_coordinates(f, [dep_J_j, dep_I_j], order=1, mode="wrap")
     else:
         from scipy.ndimage import map_coordinates as _sc_map
+
         return _sc_map(field, [dep_J, dep_I], order=1, mode="wrap", prefilter=False)

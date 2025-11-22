@@ -21,20 +21,20 @@ Notes:
 from __future__ import annotations
 
 import os
-from typing import Dict, Tuple, Optional
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
 from . import constants
 
-
 # ----------------------------
 # Utilities
 # ----------------------------
 
-def _great_circle_distance_rad(lat_deg: np.ndarray, lon_deg: np.ndarray,
-                               lat0_deg: float, lon0_deg: float) -> np.ndarray:
+
+def _great_circle_distance_rad(
+    lat_deg: np.ndarray, lon_deg: np.ndarray, lat0_deg: float, lon0_deg: float
+) -> np.ndarray:
     """
     Great-circle angular distance (in radians) between grid (lat, lon) and a point (lat0, lon0).
     Uses the spherical law of cosines with numeric safety.
@@ -51,7 +51,7 @@ def _great_circle_distance_rad(lat_deg: np.ndarray, lon_deg: np.ndarray,
     return d
 
 
-def _rng(seed: Optional[int]) -> np.random.Generator:
+def _rng(seed: int | None) -> np.random.Generator:
     return np.random.default_rng(None if seed is None else int(seed))
 
 
@@ -87,7 +87,8 @@ def _weighted_quantile(values: np.ndarray, weights: np.ndarray, q: float) -> flo
 # L1 + L3 Elevation Generation
 # ----------------------------
 
-def _generate_L1_continents(grid, seed: int, params: Dict) -> np.ndarray:
+
+def _generate_L1_continents(grid, seed: int, params: dict) -> np.ndarray:
     """
     Large-scale continents via sum of Gaussian hills centered at random seeds on the sphere.
     Number of continents controlled by N_CONTINENTS. Width controlled by CONTINENT_SIGMA_DEG.
@@ -100,7 +101,7 @@ def _generate_L1_continents(grid, seed: int, params: Dict) -> np.ndarray:
 
     N_CONT = int(params.get("N_CONTINENTS", 3))
     SIGMA_DEG = float(params.get("CONTINENT_SIGMA_DEG", 30.0))  # ~ 3300 km half-width
-    SHAPE_P = float(params.get("CONTINENT_SHAPE_P", 2.0))       # generalized Gaussian exponent
+    SHAPE_P = float(params.get("CONTINENT_SHAPE_P", 2.0))  # generalized Gaussian exponent
     A_MIN, A_MAX = params.get("CONTINENT_AMP_RANGE", (0.8, 1.2))
 
     # Sample seed centers with optional minimum great-circle spacing.
@@ -122,9 +123,13 @@ def _generate_L1_continents(grid, seed: int, params: Dict) -> np.ndarray:
             ok = True
             for la, lo in zip(cont_lats_list, cont_lons_list):
                 # Great-circle distance between (lat_cand, lon_cand) and (la, lo)
-                lat1 = np.deg2rad(lat_cand); lon1 = np.deg2rad(lon_cand)
-                lat2 = np.deg2rad(la);       lon2 = np.deg2rad(lo)
-                cos_d = np.sin(lat1) * np.sin(lat2) + np.cos(lat1) * np.cos(lat2) * np.cos(lon1 - lon2)
+                lat1 = np.deg2rad(lat_cand)
+                lon1 = np.deg2rad(lon_cand)
+                lat2 = np.deg2rad(la)
+                lon2 = np.deg2rad(lo)
+                cos_d = np.sin(lat1) * np.sin(lat2) + np.cos(lat1) * np.cos(lat2) * np.cos(
+                    lon1 - lon2
+                )
                 cos_d = np.clip(cos_d, -1.0, 1.0)
                 d_deg = np.rad2deg(np.arccos(cos_d))
                 if d_deg < MIN_DIST_DEG:
@@ -150,7 +155,7 @@ def _generate_L1_continents(grid, seed: int, params: Dict) -> np.ndarray:
         d = _great_circle_distance_rad(lat_mesh, lon_mesh, lat0, lon0)  # radians
         sigma_rad = np.deg2rad(SIGMA_DEG)
         # generalized Gaussian bump on the sphere
-        bump = A * np.exp(- (d / sigma_rad) ** SHAPE_P)
+        bump = A * np.exp(-((d / sigma_rad) ** SHAPE_P))
         H_l1 += bump
 
     # Normalize to zero mean, unit std (avoid degenerate)
@@ -171,7 +176,7 @@ def _generate_L1_continents(grid, seed: int, params: Dict) -> np.ndarray:
     return H_l1
 
 
-def _generate_L3_fbm(grid, seed: int, params: Dict) -> np.ndarray:
+def _generate_L3_fbm(grid, seed: int, params: dict) -> np.ndarray:
     """
     Fractal Brownian Motion (fBm)-like texture using Gaussian-filtered octaves
     of white noise at decreasing smoothing scales (increasing spatial frequency).
@@ -203,7 +208,7 @@ def _generate_L3_fbm(grid, seed: int, params: Dict) -> np.ndarray:
     return fbm
 
 
-def generate_elevation_map(grid, seed: int = 42, params: Optional[Dict] = None) -> np.ndarray:
+def generate_elevation_map(grid, seed: int = 42, params: dict | None = None) -> np.ndarray:
     """
     Generate elevation (in meters) combining L1 continents and L3 fractal detail.
 
@@ -250,9 +255,10 @@ def generate_elevation_map(grid, seed: int = 42, params: Optional[Dict] = None) 
 # Sea level and land-sea mask
 # ----------------------------
 
-def create_land_sea_mask_from_elevation(elevation_m: np.ndarray,
-                                        grid,
-                                        target_land_frac: float = 0.29) -> Tuple[np.ndarray, float]:
+
+def create_land_sea_mask_from_elevation(
+    elevation_m: np.ndarray, grid, target_land_frac: float = 0.29
+) -> tuple[np.ndarray, float]:
     """
     Compute sea level by weighted quantile so that area fraction of land (H >= H_sea)
     matches target_land_frac. Returns binary mask (1=land, 0=ocean) and sea level (m).
@@ -272,11 +278,15 @@ def create_land_sea_mask_from_elevation(elevation_m: np.ndarray,
 
     # Report achieved fraction
     land_frac = float((area_w * (mask == 1)).sum() / (area_w.sum() + 1e-15))
-    print(f"[Topography] Target land fraction={target_land_frac:.3f}, achieved={land_frac:.3f}, sea_level={H_sea:.1f} m")
+    print(
+        f"[Topography] Target land fraction={target_land_frac:.3f}, achieved={land_frac:.3f}, sea_level={H_sea:.1f} m"
+    )
     return mask, float(H_sea)
 
 
-def create_land_sea_mask(grid, target_land_frac: float = 0.29, seed: int = 42, params: Optional[Dict] = None) -> np.ndarray:
+def create_land_sea_mask(
+    grid, target_land_frac: float = 0.29, seed: int = 42, params: dict | None = None
+) -> np.ndarray:
     """
     Back-compat shim: generate a natural land-sea mask by creating elevation first,
     then applying adaptive sea level to hit the target land fraction.
@@ -284,7 +294,9 @@ def create_land_sea_mask(grid, target_land_frac: float = 0.29, seed: int = 42, p
     This replaces the previous rectangular continents.
     """
     elevation = generate_elevation_map(grid, seed=seed, params=params)
-    mask, _ = create_land_sea_mask_from_elevation(elevation, grid, target_land_frac=target_land_frac)
+    mask, _ = create_land_sea_mask_from_elevation(
+        elevation, grid, target_land_frac=target_land_frac
+    )
     return mask
 
 
@@ -292,9 +304,10 @@ def create_land_sea_mask(grid, target_land_frac: float = 0.29, seed: int = 42, p
 # Base surface properties
 # ----------------------------
 
-def generate_base_properties(mask: np.ndarray,
-                             elevation: Optional[np.ndarray] = None,
-                             grid=None) -> Tuple[np.ndarray, np.ndarray]:
+
+def generate_base_properties(
+    mask: np.ndarray, elevation: np.ndarray | None = None, grid=None
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Generate ice-free base albedo and surface friction maps.
 
@@ -350,13 +363,16 @@ def generate_base_properties(mask: np.ndarray,
 # NetCDF Export
 # ----------------------------
 
-def export_topography_to_netcdf(grid,
-                                elevation: np.ndarray,
-                                land_mask: np.ndarray,
-                                base_albedo: np.ndarray,
-                                friction: np.ndarray,
-                                sea_level_m: float,
-                                out_path: str) -> None:
+
+def export_topography_to_netcdf(
+    grid,
+    elevation: np.ndarray,
+    land_mask: np.ndarray,
+    base_albedo: np.ndarray,
+    friction: np.ndarray,
+    sea_level_m: float,
+    out_path: str,
+) -> None:
     """
     Export multiple fields to NetCDF:
       - coords: lat (deg), lon (deg)
@@ -367,7 +383,9 @@ def export_topography_to_netcdf(grid,
     try:
         from netCDF4 import Dataset
     except Exception as e:
-        raise RuntimeError("netCDF4 is required for export. Please install 'netCDF4' and retry.") from e
+        raise RuntimeError(
+            "netCDF4 is required for export. Please install 'netCDF4' and retry."
+        ) from e
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
@@ -422,6 +440,7 @@ def export_topography_to_netcdf(grid,
         ds.planet_omega_rad_s = constants.PLANET_OMEGA
         ds.planet_axial_tilt_deg = constants.PLANET_AXIAL_TILT
 
+
 # ----------------------------
 # NetCDF Load & Regrid
 # ----------------------------
@@ -440,9 +459,12 @@ def load_topography_from_netcdf(path: str, grid, *, regrid: str = "auto"):
     try:
         from netCDF4 import Dataset
     except Exception as e:
-        raise RuntimeError("netCDF4 is required to load topography. Please install 'netCDF4'.") from e
+        raise RuntimeError(
+            "netCDF4 is required to load topography. Please install 'netCDF4'."
+        ) from e
 
     import numpy as np
+
     try:
         from scipy.interpolate import RegularGridInterpolator
     except Exception as e:
@@ -482,17 +504,20 @@ def load_topography_from_netcdf(path: str, grid, *, regrid: str = "auto"):
         arr = arr[:, lon_sort_idx]
         return arr
 
-    def _interp_field(src_lat, src_lon, src_field, tgt_lat_mesh, tgt_lon_mesh, method="linear", is_mask=False):
+    def _interp_field(
+        src_lat, src_lon, src_field, tgt_lat_mesh, tgt_lon_mesh, method="linear", is_mask=False
+    ):
         # Build cyclic extension in longitude to avoid seam artifacts
         lon_ext = np.concatenate([src_lon - 360.0, src_lon, src_lon + 360.0])
         field_ext = np.concatenate([src_field, src_field, src_field], axis=1)
 
         # Interpolator requires strictly increasing coords
         interp = RegularGridInterpolator(
-            (src_lat, lon_ext), field_ext,
+            (src_lat, lon_ext),
+            field_ext,
             bounds_error=False,
             fill_value=None,
-            method=("nearest" if is_mask else method)
+            method=("nearest" if is_mask else method),
         )
 
         # Query points
@@ -510,12 +535,15 @@ def load_topography_from_netcdf(path: str, grid, *, regrid: str = "auto"):
             # If any NaNs occurred (e.g., outside bounds), fall back to nearest for those pixels
             if np.any(~np.isfinite(vals)):
                 interp_nn = RegularGridInterpolator(
-                    (src_lat, lon_ext), field_ext,
+                    (src_lat, lon_ext),
+                    field_ext,
                     bounds_error=False,
                     fill_value=None,
-                    method="nearest"
+                    method="nearest",
                 )
-                nn_vals = interp_nn(np.stack([pts_lat, pts_lon], axis=-1)).reshape(tgt_lat_mesh.shape)
+                nn_vals = interp_nn(np.stack([pts_lat, pts_lon], axis=-1)).reshape(
+                    tgt_lat_mesh.shape
+                )
                 vals = np.where(np.isfinite(vals), vals, nn_vals)
 
         return vals
@@ -537,11 +565,12 @@ def load_topography_from_netcdf(path: str, grid, *, regrid: str = "auto"):
             fric = fric[:, :-1]
 
         # Quick exact-shape match path
-        same_shape = (elev.shape == (grid.n_lat, grid.n_lon))
+        same_shape = elev.shape == (grid.n_lat, grid.n_lon)
         if same_shape:
             # Also check coords close
             if regrid == "never" or (
-                np.allclose(src_lat, grid.lat, atol=1e-6) and np.allclose(src_lon, grid.lon, atol=1e-6)
+                np.allclose(src_lat, grid.lat, atol=1e-6)
+                and np.allclose(src_lon, grid.lon, atol=1e-6)
             ):
                 elevation = elev.astype(float)
                 land_mask = mask.astype(np.uint8)
@@ -549,17 +578,59 @@ def load_topography_from_netcdf(path: str, grid, *, regrid: str = "auto"):
                 friction = fric.astype(float)
             else:
                 # Shapes match but coords differ slightly; treat as regrid
-                elevation = _interp_field(src_lat, src_lon, elev, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False)
-                land_mask = _interp_field(src_lat, src_lon, mask, grid.lat_mesh, grid.lon_mesh, method="nearest", is_mask=True)
-                base_albedo = _interp_field(src_lat, src_lon, base, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False)
-                friction = _interp_field(src_lat, src_lon, fric, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False)
+                elevation = _interp_field(
+                    src_lat,
+                    src_lon,
+                    elev,
+                    grid.lat_mesh,
+                    grid.lon_mesh,
+                    method="linear",
+                    is_mask=False,
+                )
+                land_mask = _interp_field(
+                    src_lat,
+                    src_lon,
+                    mask,
+                    grid.lat_mesh,
+                    grid.lon_mesh,
+                    method="nearest",
+                    is_mask=True,
+                )
+                base_albedo = _interp_field(
+                    src_lat,
+                    src_lon,
+                    base,
+                    grid.lat_mesh,
+                    grid.lon_mesh,
+                    method="linear",
+                    is_mask=False,
+                )
+                friction = _interp_field(
+                    src_lat,
+                    src_lon,
+                    fric,
+                    grid.lat_mesh,
+                    grid.lon_mesh,
+                    method="linear",
+                    is_mask=False,
+                )
         else:
             if regrid == "never":
-                raise ValueError(f"Topography grid mismatch: source {elev.shape} vs target {(grid.n_lat, grid.n_lon)} and regrid='never'.")
-            elevation = _interp_field(src_lat, src_lon, elev, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False)
-            land_mask = _interp_field(src_lat, src_lon, mask, grid.lat_mesh, grid.lon_mesh, method="nearest", is_mask=True)
-            base_albedo = _interp_field(src_lat, src_lon, base, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False)
-            friction = _interp_field(src_lat, src_lon, fric, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False)
+                raise ValueError(
+                    f"Topography grid mismatch: source {elev.shape} vs target {(grid.n_lat, grid.n_lon)} and regrid='never'."
+                )
+            elevation = _interp_field(
+                src_lat, src_lon, elev, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False
+            )
+            land_mask = _interp_field(
+                src_lat, src_lon, mask, grid.lat_mesh, grid.lon_mesh, method="nearest", is_mask=True
+            )
+            base_albedo = _interp_field(
+                src_lat, src_lon, base, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False
+            )
+            friction = _interp_field(
+                src_lat, src_lon, fric, grid.lat_mesh, grid.lon_mesh, method="linear", is_mask=False
+            )
 
     # Basic sanity/logging
     lat_rad = np.deg2rad(grid.lat_mesh)
@@ -567,9 +638,15 @@ def load_topography_from_netcdf(path: str, grid, *, regrid: str = "auto"):
     achieved = float((area_w * (land_mask == 1)).sum() / (area_w.sum() + 1e-15))
     print(f"[Topo] Loaded: {path}")
     print(f"[Topo] Land fraction (achieved): {achieved:.3f}")
-    print(f"[Topo] Albedo stats (min/mean/max): {np.nanmin(base_albedo):.3f}/{np.nanmean(base_albedo):.3f}/{np.nanmax(base_albedo):.3f}")
-    print(f"[Topo] Friction stats (min/mean/max): {np.nanmin(friction):.2e}/{np.nanmean(friction):.2e}/{np.nanmax(friction):.2e}")
+    print(
+        f"[Topo] Albedo stats (min/mean/max): {np.nanmin(base_albedo):.3f}/{np.nanmean(base_albedo):.3f}/{np.nanmax(base_albedo):.3f}"
+    )
+    print(
+        f"[Topo] Friction stats (min/mean/max): {np.nanmin(friction):.2e}/{np.nanmean(friction):.2e}/{np.nanmax(friction):.2e}"
+    )
     if np.isfinite(elevation).any():
-        print(f"[Topo] Elevation stats (m): {np.nanmin(elevation):.1f}/{np.nanmean(elevation):.1f}/{np.nanmax(elevation):.1f}")
+        print(
+            f"[Topo] Elevation stats (m): {np.nanmin(elevation):.1f}/{np.nanmean(elevation):.1f}/{np.nanmax(elevation):.1f}"
+        )
 
     return elevation, land_mask, base_albedo, friction

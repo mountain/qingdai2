@@ -31,11 +31,13 @@ from .ports import AtmosphereToSurfaceFluxes, ColumnProcessIn, ColumnProcessOut,
 # Engines (1-layer)
 # --------------------------
 
+
 class AtmosEngine(Protocol):
     """
     Minimal 1-layer engine interface.
     step(u,v,h, dt, **kwargs) -> (u_next, v_next, h_next)
     """
+
     def step(
         self,
         u: np.ndarray,
@@ -43,19 +45,20 @@ class AtmosEngine(Protocol):
         h: np.ndarray,
         dt: float,
         **kwargs: Any,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        ...
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
 
 # --------------------------
 # Coupler
 # --------------------------
 
+
 class AtmosCoupler(Protocol):
     """
     Coupler interface. Converts surface/column inputs to interface fluxes
     and in-column outputs (without mutating the DBA state).
     """
+
     def compute(
         self,
         surface_in: SurfaceToAtmosphere | None,
@@ -63,13 +66,13 @@ class AtmosCoupler(Protocol):
         grid: Any | None,
         state: Any,
         dt: float,
-    ) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
-        ...
+    ) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]: ...
 
 
 # --------------------------
 # Factories (optional)
 # --------------------------
+
 
 def make_engine(kind: str, **kwargs: Any) -> AtmosEngine:
     """
@@ -80,9 +83,11 @@ def make_engine(kind: str, **kwargs: Any) -> AtmosEngine:
     """
     if kind == "legacy_spectral":
         from .atmosphere_backend import LegacySpectralBackend
+
         return LegacySpectralBackend(**kwargs)
     if kind == "demo_relax":
         from .atmos_kernels import DemoRelaxEngine
+
         return DemoRelaxEngine(**kwargs)
     raise ValueError(f"Unknown AtmosEngine kind: {kind!r}")
 
@@ -95,6 +100,7 @@ def make_coupler(kind: str = "default", **kwargs: Any) -> AtmosCoupler:
     """
     if kind == "default":
         from .coupler import Coupler, CouplerParams
+
         params = kwargs.get("params") or CouplerParams()
         return Coupler(params)
     raise ValueError(f"Unknown AtmosCoupler kind: {kind!r}")

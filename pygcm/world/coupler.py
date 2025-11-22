@@ -69,12 +69,14 @@ class Coupler:
         if self.params.use_energy_module:
             try:
                 from pygcm import energy as _energy
+
                 self._energy = _energy
             except Exception:
                 self._energy = None
         if self.params.use_humidity_module:
             try:
                 from pygcm import humidity as _humidity
+
                 self._humidity = _humidity
             except Exception:
                 self._humidity = None
@@ -82,12 +84,14 @@ class Coupler:
         # Constants
         self.LV = float(getattr(constants, "LV", 2.5e6))
 
-    def compute(self,
-                surface_in: SurfaceToAtmosphere | None,
-                column_in: ColumnProcessIn | None,
-                grid: Any | None,
-                state: Any,
-                dt: float) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
+    def compute(
+        self,
+        surface_in: SurfaceToAtmosphere | None,
+        column_in: ColumnProcessIn | None,
+        grid: Any | None,
+        state: Any,
+        dt: float,
+    ) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
         """
         Compute interface fluxes (atmosphere -> surface) and in-column updates.
 
@@ -136,7 +140,7 @@ class Coupler:
                     q=q,
                     Vmag=V10,
                     surface_factor=xp.ones_like(T_s),
-                    params=getattr(self._humidity, "HumidityParams", object)()  # default params
+                    params=getattr(self._humidity, "HumidityParams", object)(),  # default params
                 )
                 evap_flux = E
                 LH = self.LV * E  # W m^-2, positive upward from surface
@@ -180,14 +184,23 @@ class Coupler:
                 LH_release = self.LV * precip_next
 
         fluxes = AtmosphereToSurfaceFluxes(
-            SH=SH, LH=LH, SW_sfc=SW_sfc, LW_sfc=LW_sfc, Qnet=Qnet,
-            evap_flux=evap_flux, precip_flux=precip_flux
+            SH=SH,
+            LH=LH,
+            SW_sfc=SW_sfc,
+            LW_sfc=LW_sfc,
+            Qnet=Qnet,
+            evap_flux=evap_flux,
+            precip_flux=precip_flux,
         )
-        col_out = None if q_next is None else ColumnProcessOut(
-            q_next=q_next,
-            cloud_next=cloud_next if cloud_next is not None else xp.zeros_like(T_s),
-            precip_rate_next=precip_next if precip_next is not None else xp.zeros_like(T_s),
-            LH_release=LH_release
+        col_out = (
+            None
+            if q_next is None
+            else ColumnProcessOut(
+                q_next=q_next,
+                cloud_next=cloud_next if cloud_next is not None else xp.zeros_like(T_s),
+                precip_rate_next=precip_next if precip_next is not None else xp.zeros_like(T_s),
+                LH_release=LH_release,
+            )
         )
         return fluxes, col_out
 
@@ -211,5 +224,5 @@ class Coupler:
             q_next=q_next,
             cloud_next=cloud_next,
             precip_rate_next=precip_next,
-            LH_release=LH_release
+            LH_release=LH_release,
         )

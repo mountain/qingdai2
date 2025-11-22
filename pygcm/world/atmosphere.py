@@ -60,6 +60,7 @@ class AtmosParams:
     These mirror DemoRelaxParams in `atmos_kernels.py` so that tests and callers can
     configure relaxation times and hyperdiffusion in a backend-agnostic way.
     """
+
     tau_relax_u_s: float = 2.0 * 24 * 3600.0  # 2 days
     tau_relax_v_s: float = 2.0 * 24 * 3600.0
     tau_relax_h_s: float = 2.0 * 24 * 3600.0
@@ -80,15 +81,17 @@ class Atmosphere:
     - Delegate interface/column couplings to coupler.compute(...) and return outputs
     """
 
-    def __init__(self,
-                 params: AtmosParams | None = None,
-                 *,
-                 engine: AtmosEngine | None = None,
-                 coupler: AtmosCoupler | None = None,
-                 engine_kind: str = "demo_relax",
-                 engine_kwargs: dict | None = None,
-                 coupler_kind: str = "default",
-                 coupler_kwargs: dict | None = None) -> None:
+    def __init__(
+        self,
+        params: AtmosParams | None = None,
+        *,
+        engine: AtmosEngine | None = None,
+        coupler: AtmosCoupler | None = None,
+        engine_kind: str = "demo_relax",
+        engine_kwargs: dict | None = None,
+        coupler_kind: str = "default",
+        coupler_kwargs: dict | None = None,
+    ) -> None:
         # Normalized parameter object (also used to seed default demo engine).
         self.params = params or AtmosParams()
 
@@ -117,13 +120,15 @@ class Atmosphere:
 
         self.coupler: AtmosCoupler = coupler or make_coupler(coupler_kind, **(coupler_kwargs or {}))
 
-    def time_step(self,
-                  state,
-                  dt: float,
-                  *,
-                  h_eq: np.ndarray | None = None,
-                  surface_in: SurfaceToAtmosphere | None = None,
-                  column_in: ColumnProcessIn | None = None) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
+    def time_step(
+        self,
+        state,
+        dt: float,
+        *,
+        h_eq: np.ndarray | None = None,
+        surface_in: SurfaceToAtmosphere | None = None,
+        column_in: ColumnProcessIn | None = None,
+    ) -> tuple[AtmosphereToSurfaceFluxes | None, ColumnProcessOut | None]:
         """
         Advance (u, v, h) one step (WRITE only; no swap). Return (fluxes, col_out).
 
@@ -149,19 +154,24 @@ class Atmosphere:
         state.atmos.h.write[:] = h_next
 
         # Coupling (pure computation, array-in/array-out)
-        fluxes, col_out = self.coupler.compute(surface_in, column_in, getattr(state, "grid", None), state, float(dt))
+        fluxes, col_out = self.coupler.compute(
+            surface_in, column_in, getattr(state, "grid", None), state, float(dt)
+        )
         return fluxes, col_out
 
 
 # --- Optional: diagnostics convenience wrappers (proxy to world.diagnostics) ---
 
+
 def invariants_from_read(state, grid, mask=None):
     from .diagnostics import invariants_from_read as _ifr
+
     return _ifr(state, grid, mask)
 
 
 def invariants_from_write(state, grid, mask=None):
     from .diagnostics import invariants_from_write as _ifw
+
     return _ifw(state, grid, mask)
 
 
@@ -169,6 +179,7 @@ def diagnostics_report_read_write(state, grid, mask=None):
     from .diagnostics import diagnostics_report as _rep
     from .diagnostics import invariants_from_read as _ifr
     from .diagnostics import invariants_from_write as _ifw
+
     prev = _ifr(state, grid, mask)
     nxt = _ifw(state, grid, mask)
     return _rep(prev, nxt)

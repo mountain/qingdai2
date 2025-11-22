@@ -5,12 +5,15 @@ Defines the spherical grid system for the planet Qingdai.
 """
 
 import numpy as np
+
 from . import constants
+
 
 class SphericalGrid:
     """
     Represents a global spherical grid.
     """
+
     def __init__(self, n_lat, n_lon):
         """
         Initializes a grid with a specified resolution.
@@ -47,7 +50,7 @@ class SphericalGrid:
         a = constants.PLANET_RADIUS
         lat_rad = np.deg2rad(self.lat_mesh)
         cos_lat = np.cos(lat_rad)
-        
+
         # Avoid division by zero at the poles
         cos_lat_capped = np.maximum(cos_lat, 1e-6)
 
@@ -57,14 +60,16 @@ class SphericalGrid:
 
         # d(v * cos(phi))/d(phi)
         v_cos_phi = v * cos_lat
-        dv_cos_phi_dlat = (np.roll(v_cos_phi, -1, axis=0) - np.roll(v_cos_phi, 1, axis=0)) / (2 * self.dlat_rad)
-        
+        dv_cos_phi_dlat = (np.roll(v_cos_phi, -1, axis=0) - np.roll(v_cos_phi, 1, axis=0)) / (
+            2 * self.dlat_rad
+        )
+
         # At the poles, the gradient calculation is singular. We can set it to 0.
         dv_cos_phi_dlat[0, :] = 0
         dv_cos_phi_dlat[-1, :] = 0
 
         div = (1 / (a * cos_lat_capped)) * (du_dlon + dv_cos_phi_dlat)
-        
+
         return div
 
     def vorticity(self, u, v):
@@ -78,9 +83,11 @@ class SphericalGrid:
         cos_lat_capped = np.maximum(cos_lat, 1e-6)
 
         dv_dlon = (np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1)) / (2 * self.dlon_rad)
-        
+
         u_cos_phi = u * cos_lat
-        du_cos_phi_dlat = (np.roll(u_cos_phi, -1, axis=0) - np.roll(u_cos_phi, 1, axis=0)) / (2 * self.dlat_rad)
+        du_cos_phi_dlat = (np.roll(u_cos_phi, -1, axis=0) - np.roll(u_cos_phi, 1, axis=0)) / (
+            2 * self.dlat_rad
+        )
         du_cos_phi_dlat[0, :] = 0
         du_cos_phi_dlat[-1, :] = 0
 
@@ -95,7 +102,8 @@ class SphericalGrid:
         f = 2 * constants.PLANET_OMEGA * np.sin(lat_rad)
         return f
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Example usage: Create a grid and print some properties
     grid = SphericalGrid(n_lat=73, n_lon=144)
     print(f"Grid created with {grid.n_lat} latitude points and {grid.n_lon} longitude points.")

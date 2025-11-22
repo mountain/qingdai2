@@ -32,6 +32,7 @@ except Exception:
 # Backend base interface
 # -----------------------
 
+
 class AtmosphereBackend:
     """
     Minimal interface for an atmosphere backend engine.
@@ -41,18 +42,16 @@ class AtmosphereBackend:
     Inputs/outputs are plain arrays; DBA is handled by the orchestrator.
     """
 
-    def step(self,
-             u: np.ndarray,
-             v: np.ndarray,
-             h: np.ndarray,
-             dt: float,
-             **kwargs: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def step(
+        self, u: np.ndarray, v: np.ndarray, h: np.ndarray, dt: float, **kwargs: Any
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError
 
 
 # ---------------------------------
 # Legacy SpectralModel bridge
 # ---------------------------------
+
 
 @dataclass
 class LegacySpectralParams:
@@ -79,17 +78,19 @@ class LegacySpectralBackend(AtmosphereBackend):
     - The DBA is handled by the orchestrator (world/atmosphere).
     """
 
-    def __init__(self,
-                 grid,
-                 friction_map: np.ndarray,
-                 land_mask: np.ndarray,
-                 *,
-                 params: LegacySpectralParams | None = None,
-                 C_s_map: np.ndarray | None = None,
-                 Cs_ocean: float | None = None,
-                 Cs_land: float | None = None,
-                 Cs_ice: float | None = None,
-                 greenhouse_factor: float | None = None) -> None:
+    def __init__(
+        self,
+        grid,
+        friction_map: np.ndarray,
+        land_mask: np.ndarray,
+        *,
+        params: LegacySpectralParams | None = None,
+        C_s_map: np.ndarray | None = None,
+        Cs_ocean: float | None = None,
+        Cs_land: float | None = None,
+        Cs_ice: float | None = None,
+        greenhouse_factor: float | None = None,
+    ) -> None:
         from pygcm.dynamics import SpectralModel  # import here to avoid world-level hard dependency
 
         p = params or LegacySpectralParams()
@@ -119,12 +120,9 @@ class LegacySpectralBackend(AtmosphereBackend):
             Cs_ice=p.Cs_ice,
         )
 
-    def step(self,
-             u: np.ndarray,
-             v: np.ndarray,
-             h: np.ndarray,
-             dt: float,
-             **kwargs: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def step(
+        self, u: np.ndarray, v: np.ndarray, h: np.ndarray, dt: float, **kwargs: Any
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         kwargs may include (all optional, pass-through if present):
           - Teq: ndarray, equilibrium temperature forcing for the legacy engine
@@ -157,6 +155,4 @@ class LegacySpectralBackend(AtmosphereBackend):
         self.gcm.time_step(Teq, float(dt))
 
         # 3) Return next-step arrays (plain arrays)
-        return (np.asarray(self.gcm.u),
-                np.asarray(self.gcm.v),
-                np.asarray(self.gcm.h))
+        return (np.asarray(self.gcm.u), np.asarray(self.gcm.v), np.asarray(self.gcm.h))

@@ -16,8 +16,8 @@ from .genes import Genes, Peak, reflectance_from_genes, absorbance_from_genes
 class AdapterConfig:
     substep_every_nphys: int = 1
     lai_albedo_weight: float = 1.0
-    feedback_mode: str = "instant"       # instant|daily
-    couple_freq: str = "subdaily"        # subdaily|daily
+    feedback_mode: str = "instant"  # instant|daily
+    couple_freq: str = "subdaily"  # subdaily|daily
 
 
 class EcologyAdapter:
@@ -29,9 +29,10 @@ class EcologyAdapter:
     Returns:
         alpha_surface_ecology_map (2D, same shape as I_total), with ocean cells set to NaN.
     """
+
     def __init__(self, grid, land_mask: np.ndarray):
         self.grid = grid
-        self.land_mask = (land_mask == 1)
+        self.land_mask = land_mask == 1
         self.cfg = AdapterConfig(
             substep_every_nphys=int(os.getenv("QD_ECO_SUBSTEP_EVERY_NPHYS", "1")),
             lai_albedo_weight=float(os.getenv("QD_ECO_LAI_ALBEDO_WEIGHT", "1.0")),
@@ -70,16 +71,22 @@ class EcologyAdapter:
         # Diagnostics toggle
         self._diag = int(os.getenv("QD_ECO_DIAG", "1")) == 1
         if self._diag:
-            print(f"[Ecology] M1 adapter init: NB={self.bands.nbands}, alpha_leaf≈{self.alpha_leaf_scalar:.3f}, "
-                  f"substep_every={self.cfg.substep_every_nphys}, W_LAI={self.cfg.lai_albedo_weight:.2f}, "
-                  f"feedback={self.cfg.feedback_mode}, couple_freq={self.cfg.couple_freq}")
+            print(
+                f"[Ecology] M1 adapter init: NB={self.bands.nbands}, alpha_leaf≈{self.alpha_leaf_scalar:.3f}, "
+                f"substep_every={self.cfg.substep_every_nphys}, W_LAI={self.cfg.lai_albedo_weight:.2f}, "
+                f"feedback={self.cfg.feedback_mode}, couple_freq={self.cfg.couple_freq}"
+            )
 
         # M2: optional prognostic LAI manager
         use_lai = int(os.getenv("QD_ECO_USE_LAI", "1")) == 1
-        self.pop = PopulationManager(self.land_mask.astype(int), diag=self._diag) if use_lai else None
+        self.pop = (
+            PopulationManager(self.land_mask.astype(int), diag=self._diag) if use_lai else None
+        )
         if self._diag and self.pop is not None:
             s = self.pop.summary()
-            print(f"[Ecology] LAI init: min/mean/max={s['LAI_min']:.2f}/{s['LAI_mean']:.2f}/{s['LAI_max']:.2f} (use_lai={use_lai})")
+            print(
+                f"[Ecology] LAI init: min/mean/max={s['LAI_min']:.2f}/{s['LAI_mean']:.2f}/{s['LAI_max']:.2f} (use_lai={use_lai})"
+            )
         # Genes list cache
         self.genes_list: list[Genes] = []
 
@@ -111,7 +118,9 @@ class EcologyAdapter:
             if self.pop is not None:
                 self.pop.set_species_reflectance_bands(R_species_nb)
             if self._diag:
-                print(f"[Ecology] Species bands set: Ns={R_species_nb.shape[0]}, NB={R_species_nb.shape[1]}")
+                print(
+                    f"[Ecology] Species bands set: Ns={R_species_nb.shape[0]}, NB={R_species_nb.shape[1]}"
+                )
         except Exception as _es:
             if self._diag:
                 print(f"[Ecology] Species bands not set (fallback to single template): {_es}")
@@ -124,23 +133,33 @@ class EcologyAdapter:
                 # Skip if user explicitly provided IDENTITY for this species
                 if os.getenv(f"QD_ECO_SPECIES_{i}_IDENTITY"):
                     continue
-                mode_i = (modes[i] if (i < len(modes) and modes[i] in ("seed", "diffusion"))
-                          else ("seed" if i == 1 else "diffusion"))
-                g.identity = ("tree" if mode_i == "seed" else "grass")
+                mode_i = (
+                    modes[i]
+                    if (i < len(modes) and modes[i] in ("seed", "diffusion"))
+                    else ("seed" if i == 1 else "diffusion")
+                )
+                g.identity = "tree" if mode_i == "seed" else "grass"
             if self._diag:
-                n_tree = sum(1 for i, g in enumerate(self.genes_list)
-                             if (os.getenv(f"QD_ECO_SPECIES_{i}_IDENTITY") is None) and g.identity == "tree")
-                n_grass = sum(1 for i, g in enumerate(self.genes_list)
-                              if (os.getenv(f"QD_ECO_SPECIES_{i}_IDENTITY") is None) and g.identity == "grass")
-                print(f"[Ecology] Species identities mapped by modes: grass={n_grass}, tree={n_tree}")
+                n_tree = sum(
+                    1
+                    for i, g in enumerate(self.genes_list)
+                    if (os.getenv(f"QD_ECO_SPECIES_{i}_IDENTITY") is None) and g.identity == "tree"
+                )
+                n_grass = sum(
+                    1
+                    for i, g in enumerate(self.genes_list)
+                    if (os.getenv(f"QD_ECO_SPECIES_{i}_IDENTITY") is None) and g.identity == "grass"
+                )
+                print(
+                    f"[Ecology] Species identities mapped by modes: grass={n_grass}, tree={n_tree}"
+                )
         except Exception as _ei:
             if self._diag:
                 print(f"[Ecology] Species identity mapping skipped: {_ei}")
 
-    def step_subdaily(self,
-                      I_total: np.ndarray,
-                      cloud_eff: np.ndarray | float,
-                      dt_seconds: float) -> np.ndarray | None:
+    def step_subdaily(
+        self, I_total: np.ndarray, cloud_eff: np.ndarray | float, dt_seconds: float
+    ) -> np.ndarray | None:
         """
         Compute a land-only surface albedo map for ecology and return it
         for immediate coupling (if enabled). Returns None when not at substep boundary.
@@ -171,13 +190,17 @@ class EcologyAdapter:
                 soil_ref = float(os.getenv("QD_ECO_SOIL_REFLECT", "0.20"))
                 leaf_s = self.alpha_leaf_scalar  # Σ_b R_leaf[b]·w_b (w_b 归一)
                 alpha_map[self.land_mask] = np.clip(
-                    leaf_s * f_canopy[self.land_mask] + (1.0 - f_canopy[self.land_mask]) * soil_ref, 0.0, 1.0
+                    leaf_s * f_canopy[self.land_mask] + (1.0 - f_canopy[self.land_mask]) * soil_ref,
+                    0.0,
+                    1.0,
                 )
                 if self._diag and (self._step_count % 200 == 0):
                     s = self.pop.summary()
                     am = alpha_map[self.land_mask]
-                    print(f"[Ecology] subdaily(M2): LAI(min/mean/max)={s['LAI_min']:.2f}/{s['LAI_mean']:.2f}/{s['LAI_max']:.2f} | "
-                          f"alpha_land(min/mean/max)={np.nanmin(am):.3f}/{np.nanmean(am):.3f}/{np.nanmax(am):.3f}")
+                    print(
+                        f"[Ecology] subdaily(M2): LAI(min/mean/max)={s['LAI_min']:.2f}/{s['LAI_mean']:.2f}/{s['LAI_max']:.2f} | "
+                        f"alpha_land(min/mean/max)={np.nanmin(am):.3f}/{np.nanmean(am):.3f}/{np.nanmax(am):.3f}"
+                    )
             except Exception:
                 # fallback to M1 scalar
                 alpha_scalar = float(np.clip(self.alpha_leaf_scalar, 0.0, 1.0))
@@ -213,7 +236,12 @@ class EcologyAdapter:
             table = []
             # Species weights (if available)
             try:
-                weights = [float(x) for x in np.asarray(getattr(self.pop, "species_weights", []), dtype=float).tolist()]
+                weights = [
+                    float(x)
+                    for x in np.asarray(
+                        getattr(self.pop, "species_weights", []), dtype=float
+                    ).tolist()
+                ]
             except Exception:
                 weights = None
 
@@ -223,20 +251,24 @@ class EcologyAdapter:
                 for pk in peaks:
                     try:
                         sigma = float(pk.width_nm)
-                        peaks_out.append({
-                            "center_nm": float(pk.center_nm),
-                            "sigma_nm": sigma,
-                            "variance_nm2": float(sigma * sigma),
-                            "height": float(pk.height),
-                        })
+                        peaks_out.append(
+                            {
+                                "center_nm": float(pk.center_nm),
+                                "sigma_nm": sigma,
+                                "variance_nm2": float(sigma * sigma),
+                                "height": float(pk.height),
+                            }
+                        )
                     except Exception:
                         # Minimal fallback
-                        peaks_out.append({
-                            "center_nm": float(getattr(pk, "center_nm", 0.0)),
-                            "sigma_nm": float(getattr(pk, "width_nm", 0.0)),
-                            "variance_nm2": float(getattr(pk, "width_nm", 0.0)) ** 2,
-                            "height": float(getattr(pk, "height", 0.0)),
-                        })
+                        peaks_out.append(
+                            {
+                                "center_nm": float(getattr(pk, "center_nm", 0.0)),
+                                "sigma_nm": float(getattr(pk, "width_nm", 0.0)),
+                                "variance_nm2": float(getattr(pk, "width_nm", 0.0)) ** 2,
+                                "height": float(getattr(pk, "height", 0.0)),
+                            }
+                        )
 
                 entry = {
                     "index": i,
@@ -252,9 +284,16 @@ class EcologyAdapter:
                     "peaks_model": "gaussian",
                     "peaks": peaks_out,
                     # Embed band definitions per-gene to make the entry self-contained
-                    "lambda_centers_nm": [float(x) for x in np.asarray(self.bands.lambda_centers, dtype=float).tolist()],
-                    "delta_lambda_nm": [float(x) for x in np.asarray(self.bands.delta_lambda, dtype=float).tolist()],
-                    "lambda_edges_nm": [float(x) for x in np.asarray(self.bands.lambda_edges, dtype=float).tolist()],
+                    "lambda_centers_nm": [
+                        float(x)
+                        for x in np.asarray(self.bands.lambda_centers, dtype=float).tolist()
+                    ],
+                    "delta_lambda_nm": [
+                        float(x) for x in np.asarray(self.bands.delta_lambda, dtype=float).tolist()
+                    ],
+                    "lambda_edges_nm": [
+                        float(x) for x in np.asarray(self.bands.lambda_edges, dtype=float).tolist()
+                    ],
                 }
                 if weights is not None and i < len(weights):
                     entry["weight"] = weights[i]
@@ -266,7 +305,7 @@ class EcologyAdapter:
                 "day": float(day_value),
                 "bands": {
                     "nbands": int(self.bands.nbands),
-                    "band_weights": [float(x) for x in np.asarray(self.w_b, dtype=float).tolist()]
+                    "band_weights": [float(x) for x in np.asarray(self.w_b, dtype=float).tolist()],
                 },
                 "genes": table,
             }
@@ -294,7 +333,12 @@ class EcologyAdapter:
         try:
             # Species weights (optional snapshot)
             try:
-                weights = [float(x) for x in np.asarray(getattr(self.pop, "species_weights", []), dtype=float).tolist()]
+                weights = [
+                    float(x)
+                    for x in np.asarray(
+                        getattr(self.pop, "species_weights", []), dtype=float
+                    ).tolist()
+                ]
             except Exception:
                 weights = None
             genes_tbl = []
@@ -304,19 +348,23 @@ class EcologyAdapter:
                 for pk in peaks:
                     try:
                         sigma = float(pk.width_nm)
-                        peaks_out.append({
-                            "center_nm": float(pk.center_nm),
-                            "sigma_nm": sigma,
-                            "variance_nm2": float(sigma * sigma),
-                            "height": float(pk.height),
-                        })
+                        peaks_out.append(
+                            {
+                                "center_nm": float(pk.center_nm),
+                                "sigma_nm": sigma,
+                                "variance_nm2": float(sigma * sigma),
+                                "height": float(pk.height),
+                            }
+                        )
                     except Exception:
-                        peaks_out.append({
-                            "center_nm": float(getattr(pk, "center_nm", 0.0)),
-                            "sigma_nm": float(getattr(pk, "width_nm", 0.0)),
-                            "variance_nm2": float(getattr(pk, "width_nm", 0.0)) ** 2,
-                            "height": float(getattr(pk, "height", 0.0)),
-                        })
+                        peaks_out.append(
+                            {
+                                "center_nm": float(getattr(pk, "center_nm", 0.0)),
+                                "sigma_nm": float(getattr(pk, "width_nm", 0.0)),
+                                "variance_nm2": float(getattr(pk, "width_nm", 0.0)) ** 2,
+                                "height": float(getattr(pk, "height", 0.0)),
+                            }
+                        )
                 entry = {
                     "index": i,
                     "identity": getattr(g, "identity", f"sp{i}"),
@@ -338,7 +386,7 @@ class EcologyAdapter:
                 "day": float(day_value) if day_value is not None else None,
                 "bands": {
                     "nbands": int(self.bands.nbands),
-                    "band_weights": [float(x) for x in np.asarray(self.w_b, dtype=float).tolist()]
+                    "band_weights": [float(x) for x in np.asarray(self.w_b, dtype=float).tolist()],
                 },
                 "genes": genes_tbl,
             }
@@ -379,7 +427,11 @@ class EcologyAdapter:
                         if sigma <= 0 and "variance_nm2" in pk:
                             var = float(pk.get("variance_nm2", 0.0))
                             sigma = float(np.sqrt(max(0.0, var)))
-                        peaks.append(Peak(float(pk.get("center_nm", 0.0)), sigma, float(pk.get("height", 0.0))))
+                        peaks.append(
+                            Peak(
+                                float(pk.get("center_nm", 0.0)), sigma, float(pk.get("height", 0.0))
+                            )
+                        )
                     except Exception:
                         continue
                 g = Genes(
@@ -397,7 +449,9 @@ class EcologyAdapter:
                 # normalize allocations
                 s = g.alloc_root + g.alloc_stem + g.alloc_leaf
                 if s > 0:
-                    g.alloc_root /= s; g.alloc_stem /= s; g.alloc_leaf /= s
+                    g.alloc_root /= s
+                    g.alloc_stem /= s
+                    g.alloc_leaf /= s
                 genes_in.append(g)
 
             if len(genes_in) == 0:
@@ -410,7 +464,9 @@ class EcologyAdapter:
 
             # Rebuild per-species reflectance with current bands
             try:
-                R_species_nb = np.stack([reflectance_from_genes(self.bands, g) for g in self.genes_list], axis=0)
+                R_species_nb = np.stack(
+                    [reflectance_from_genes(self.bands, g) for g in self.genes_list], axis=0
+                )
                 if getattr(self, "pop", None) is not None:
                     self.pop.set_species_reflectance_bands(R_species_nb)
             except Exception as e:
@@ -418,7 +474,9 @@ class EcologyAdapter:
                     print(f"[Ecology] Genes reflectance rebuild failed: {e}")
 
             if self._diag:
-                print(f"[Ecology] Genes autosave loaded: Ns={len(self.genes_list)} (band nb={self.bands.nbands})")
+                print(
+                    f"[Ecology] Genes autosave loaded: Ns={len(self.genes_list)} (band nb={self.bands.nbands})"
+                )
             return True
         except Exception as e:
             if self._diag:
@@ -433,7 +491,9 @@ class EcologyAdapter:
             self.pop.step_daily(soil_water_index)
             if self._diag:
                 s = self.pop.summary()
-                print(f"[Ecology] daily: LAI(min/mean/max)={s['LAI_min']:.2f}/{s['LAI_mean']:.2f}/{s['LAI_max']:.2f}")
+                print(
+                    f"[Ecology] daily: LAI(min/mean/max)={s['LAI_min']:.2f}/{s['LAI_mean']:.2f}/{s['LAI_max']:.2f}"
+                )
             # Evolution: stochastic mutation/new species (minimal M4)
             if self.mut_rate > 0.0 and np.random.rand() < self.mut_rate:
                 S_now = int(getattr(self.pop, "Ns", len(self.genes_list) or 1))
@@ -448,7 +508,11 @@ class EcologyAdapter:
                     idx_new = self.pop.add_species_from_parent(parent, frac=self.mut_eps)
                     # mutate genes from parent
                     try:
-                        g_parent = self.genes_list[parent] if parent < len(self.genes_list) else Genes.from_env()
+                        g_parent = (
+                            self.genes_list[parent]
+                            if parent < len(self.genes_list)
+                            else Genes.from_env()
+                        )
                         g_new = self._mutate_genes(g_parent)
                     except Exception:
                         g_new = Genes.from_env()
@@ -457,11 +521,15 @@ class EcologyAdapter:
                         self.genes_list.append(g_new)
                     else:
                         # safety: extend list
-                        self.genes_list = (self.genes_list + [g_new])[:idx_new+1]
-                    R_species_nb = np.stack([reflectance_from_genes(self.bands, g) for g in self.genes_list], axis=0)
+                        self.genes_list = (self.genes_list + [g_new])[: idx_new + 1]
+                    R_species_nb = np.stack(
+                        [reflectance_from_genes(self.bands, g) for g in self.genes_list], axis=0
+                    )
                     self.pop.set_species_reflectance_bands(R_species_nb)
                     if self._diag:
-                        print(f"[Ecology] mutation: parent={parent} → new species idx={idx_new}; Ns={len(self.genes_list)}")
+                        print(
+                            f"[Ecology] mutation: parent={parent} → new species idx={idx_new}; Ns={len(self.genes_list)}"
+                        )
                 elif self._diag:
                     print(f"[Ecology] mutation skipped: species_max={self.species_max} reached.")
         except Exception as e:
@@ -479,7 +547,9 @@ class EcologyAdapter:
             alloc_stem=g.alloc_stem,
             alloc_leaf=g.alloc_leaf,
             leaf_area_per_energy=g.leaf_area_per_energy,
-            absorption_peaks=[Peak(pk.center_nm, pk.width_nm, pk.height) for pk in g.absorption_peaks],
+            absorption_peaks=[
+                Peak(pk.center_nm, pk.width_nm, pk.height) for pk in g.absorption_peaks
+            ],
             drought_tolerance=g.drought_tolerance,
             gdd_germinate=g.gdd_germinate,
             lifespan_days=g.lifespan_days,
@@ -490,18 +560,25 @@ class EcologyAdapter:
         g2.alloc_stem = float(np.clip(g2.alloc_stem + np.random.uniform(-jit, jit), 0.05, 0.90))
         g2.alloc_leaf = float(np.clip(g2.alloc_leaf + np.random.uniform(-jit, jit), 0.05, 0.90))
         s = g2.alloc_root + g2.alloc_stem + g2.alloc_leaf
-        g2.alloc_root /= s; g2.alloc_stem /= s; g2.alloc_leaf /= s
+        g2.alloc_root /= s
+        g2.alloc_stem /= s
+        g2.alloc_leaf /= s
         # Spectral peaks jitter
         for pk in g2.absorption_peaks:
             pk.center_nm = float(np.clip(pk.center_nm + np.random.normal(0.0, 8.0), 380.0, 780.0))
-            pk.width_nm  = float(np.clip(pk.width_nm  + np.random.normal(0.0, 5.0), 10.0, 120.0))
-            pk.height    = float(np.clip(pk.height    + np.random.normal(0.0, 0.05), 0.05, 0.98))
+            pk.width_nm = float(np.clip(pk.width_nm + np.random.normal(0.0, 5.0), 10.0, 120.0))
+            pk.height = float(np.clip(pk.height + np.random.normal(0.0, 0.05), 0.05, 0.98))
         # Physiology jitter
-        g2.drought_tolerance = float(np.clip(g2.drought_tolerance + np.random.normal(0.0, 0.03), 0.05, 0.95))
-        g2.gdd_germinate     = float(np.clip(g2.gdd_germinate + np.random.normal(0.0, 5.0), 10.0, 500.0))
-        g2.lifespan_days     = int(np.clip(g2.lifespan_days + np.random.normal(0.0, 30.0), 30, 365*5))
-        g2.leaf_area_per_energy = float(np.clip(g2.leaf_area_per_energy * (1.0 + np.random.normal(0.0, 0.1)),
-                                                1e-5, 5e-2))
+        g2.drought_tolerance = float(
+            np.clip(g2.drought_tolerance + np.random.normal(0.0, 0.03), 0.05, 0.95)
+        )
+        g2.gdd_germinate = float(
+            np.clip(g2.gdd_germinate + np.random.normal(0.0, 5.0), 10.0, 500.0)
+        )
+        g2.lifespan_days = int(np.clip(g2.lifespan_days + np.random.normal(0.0, 30.0), 30, 365 * 5))
+        g2.leaf_area_per_energy = float(
+            np.clip(g2.leaf_area_per_energy * (1.0 + np.random.normal(0.0, 0.1)), 1e-5, 5e-2)
+        )
         # Environment-biased spectral drift: nudge centers toward current weighted band center
         try:
             lam = np.asarray(self.bands.lambda_centers, dtype=float)
@@ -509,7 +586,9 @@ class EcologyAdapter:
             lam_w = float(np.sum(lam * wb) / (np.sum(wb) + 1e-12))
             alpha = float(os.getenv("QD_ECO_MUT_LAMBDA_DRIFT", "0.1"))
             for pk in g2.absorption_peaks:
-                pk.center_nm = float(np.clip(pk.center_nm + alpha * (lam_w - pk.center_nm), 380.0, 780.0))
+                pk.center_nm = float(
+                    np.clip(pk.center_nm + alpha * (lam_w - pk.center_nm), 380.0, 780.0)
+                )
         except Exception:
             pass
         return g2
@@ -552,10 +631,18 @@ class EcologyAdapter:
         """
         try:
             peaks = getattr(g, "absorption_peaks", []) or []
-            pk_key = tuple((float(getattr(p, "center_nm", 0.0)),
-                            float(getattr(p, "width_nm", 0.0)),
-                            float(getattr(p, "height", 0.0))) for p in peaks)
-            lam_key = tuple(float(x) for x in np.asarray(self.bands.lambda_centers, dtype=float).ravel().tolist())
+            pk_key = tuple(
+                (
+                    float(getattr(p, "center_nm", 0.0)),
+                    float(getattr(p, "width_nm", 0.0)),
+                    float(getattr(p, "height", 0.0)),
+                )
+                for p in peaks
+            )
+            lam_key = tuple(
+                float(x)
+                for x in np.asarray(self.bands.lambda_centers, dtype=float).ravel().tolist()
+            )
             key = f"{getattr(g, 'identity', 'gene')}|{pk_key}|{lam_key}"
         except Exception:
             key = f"{id(g)}|{self.bands.nbands}"
@@ -597,7 +684,9 @@ class EcologyAdapter:
                 LAI_src = getattr(self.pop, "LAI", None)
                 if LAI_src is None and hasattr(self.pop, "total_LAI"):
                     LAI_src = self.pop.total_LAI()
-                species_w = np.asarray(getattr(self.pop, "species_weights", np.asarray([1.0])), dtype=float)
+                species_w = np.asarray(
+                    getattr(self.pop, "species_weights", np.asarray([1.0])), dtype=float
+                )
                 if getattr(self.pop, "_species_R_leaf", None) is not None:
                     R_species_nb = np.asarray(self.pop._species_R_leaf, dtype=float)
 
@@ -605,6 +694,7 @@ class EcologyAdapter:
             if ext.lower() == ".nc":
                 # Write NetCDF
                 from netCDF4 import Dataset
+
                 with Dataset(tmp_path, "w") as ds:
                     # Dimensions
                     nlat, nlon = self.grid.n_lat, self.grid.n_lon
@@ -674,6 +764,7 @@ class EcologyAdapter:
             # Timestamped backup (best-effort)
             try:
                 import shutil
+
                 shutil.copy2(path_npz, backup_path)
             except Exception:
                 backup_path = None
@@ -694,7 +785,9 @@ class EcologyAdapter:
             # Also write genes.json next to ecology state (best-effort, standardized name)
             try:
                 genes_json = os.path.join(out_dir, "genes.json")
-                _ = self.save_genes_json(genes_json, day_value=day_value if day_value is not None else None)
+                _ = self.save_genes_json(
+                    genes_json, day_value=day_value if day_value is not None else None
+                )
             except Exception:
                 pass
 
@@ -718,15 +811,25 @@ class EcologyAdapter:
             return False
         try:
             import os as _os
+
             ext = _os.path.splitext(path_npz)[1].lower()
             centers = None
             R_species_nb = None
             if ext == ".nc":
                 from netCDF4 import Dataset as _DS
+
                 with _DS(path_npz, "r") as ds:
                     LAI = np.asarray(ds.variables["LAI"]) if "LAI" in ds.variables else None
-                    w = np.asarray(ds.variables["species_weights"]) if "species_weights" in ds.variables else None
-                    centers = np.asarray(ds.variables["bands_lambda_centers"]) if "bands_lambda_centers" in ds.variables else None
+                    w = (
+                        np.asarray(ds.variables["species_weights"])
+                        if "species_weights" in ds.variables
+                        else None
+                    )
+                    centers = (
+                        np.asarray(ds.variables["bands_lambda_centers"])
+                        if "bands_lambda_centers" in ds.variables
+                        else None
+                    )
                     if "R_species_nb" in ds.variables:
                         R_species_nb = np.asarray(ds.variables["R_species_nb"])
             else:
@@ -737,7 +840,9 @@ class EcologyAdapter:
                 R_species_nb = data.get("R_species_nb")
             if LAI is None or LAI.ndim != 2 or w is None or w.ndim != 1:
                 if self._diag:
-                    print("[Ecology] Autosave+ malformed: require LAI (2D) and species_weights (1D).")
+                    print(
+                        "[Ecology] Autosave+ malformed: require LAI (2D) and species_weights (1D)."
+                    )
                 return False
             # Restore LAI/species weights (like legacy helper)
             pop = self.pop
@@ -747,7 +852,9 @@ class EcologyAdapter:
             H, W = pop.shape
             w = np.clip(w, 0.0, None)
             ssum = float(np.sum(w))
-            pop.species_weights = (w / ssum) if ssum > 0 else np.full((S,), 1.0 / float(max(S, 1)), dtype=float)
+            pop.species_weights = (
+                (w / ssum) if ssum > 0 else np.full((S,), 1.0 / float(max(S, 1)), dtype=float)
+            )
             pop.Ns = int(pop.species_weights.shape[0])
             pop.LAI_layers_SK = np.zeros((pop.Ns, max(1, K), H, W), dtype=float)
             for s_idx in range(pop.Ns):
@@ -757,19 +864,27 @@ class EcologyAdapter:
             pop.LAI_layers = np.sum(pop.LAI_layers_SK, axis=0)
 
             # Try to restore bands & reflectance if shapes compatible
-            ok_adv = (centers is not None and len(centers) == self.bands.nbands and
-                      R_species_nb is not None and R_species_nb.shape[1] == self.bands.nbands)
+            ok_adv = (
+                centers is not None
+                and len(centers) == self.bands.nbands
+                and R_species_nb is not None
+                and R_species_nb.shape[1] == self.bands.nbands
+            )
             if ok_adv:
                 try:
                     pop.set_species_reflectance_bands(np.asarray(R_species_nb, dtype=float))
                 except Exception:
                     ok_adv = False
             elif self._diag and on_mismatch != "ignore":
-                print("[Ecology] Autosave+: advanced fields (bands/R_species) mismatched – restored base LAI/weights only.")
+                print(
+                    "[Ecology] Autosave+: advanced fields (bands/R_species) mismatched – restored base LAI/weights only."
+                )
             if self._diag:
                 sdiag = pop.summary()
-                print(f"[Ecology] Autosave+ loaded: LAI(min/mean/max)={sdiag['LAI_min']:.2f}/{sdiag['LAI_mean']:.2f}/{sdiag['LAI_max']:.2f}; "
-                      f"S={pop.Ns}, K={K}, advanced={'OK' if ok_adv else 'NO'}")
+                print(
+                    f"[Ecology] Autosave+ loaded: LAI(min/mean/max)={sdiag['LAI_min']:.2f}/{sdiag['LAI_mean']:.2f}/{sdiag['LAI_max']:.2f}; "
+                    f"S={pop.Ns}, K={K}, advanced={'OK' if ok_adv else 'NO'}"
+                )
             return True
         except Exception as e:
             if self._diag:
@@ -784,10 +899,18 @@ class EcologyAdapter:
         """
         try:
             peaks = getattr(g, "absorption_peaks", []) or []
-            pk_key = tuple((float(getattr(p, "center_nm", 0.0)),
-                            float(getattr(p, "width_nm", 0.0)),
-                            float(getattr(p, "height", 0.0))) for p in peaks)
-            lam_key = tuple(float(x) for x in np.asarray(self.bands.lambda_centers, dtype=float).ravel().tolist())
+            pk_key = tuple(
+                (
+                    float(getattr(p, "center_nm", 0.0)),
+                    float(getattr(p, "width_nm", 0.0)),
+                    float(getattr(p, "height", 0.0)),
+                )
+                for p in peaks
+            )
+            lam_key = tuple(
+                float(x)
+                for x in np.asarray(self.bands.lambda_centers, dtype=float).ravel().tolist()
+            )
             key = f"{getattr(g, 'identity', 'gene')}|{pk_key}|{lam_key}"
         except Exception:
             key = f"{id(g)}|{self.bands.nbands}"

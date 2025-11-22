@@ -69,8 +69,8 @@ def _species_height_map(pop, s: int, H_scale: float = 10.0) -> Optional[np.ndarr
         return None
     # Use k = 0..K-1 → h_k = (k+1)/K to match LAI_layers_SK's leading K dimension
     idx = (np.arange(K, dtype=float) + 1.0) / float(K)  # [K]
-    num = np.tensordot(idx, LAI_s_k, axes=(0, 0))          # [H,W]
-    den = np.sum(LAI_s_k, axis=0) + 1e-12                  # [H,W]
+    num = np.tensordot(idx, LAI_s_k, axes=(0, 0))  # [H,W]
+    den = np.sum(LAI_s_k, axis=0) + 1e-12  # [H,W]
     return float(H_scale) * (num / den)
 
 
@@ -86,9 +86,11 @@ def _top3_species_at_cell(pop, j: int, i: int) -> np.ndarray:
             getattr(
                 pop,
                 "LAI",
-                pop.total_LAI() if hasattr(pop, "total_LAI") else np.zeros_like(
-                    getattr(pop, "species_weights", np.ones((1,)))
-                )
+                (
+                    pop.total_LAI()
+                    if hasattr(pop, "total_LAI")
+                    else np.zeros_like(getattr(pop, "species_weights", np.ones((1,))))
+                ),
             )
         )
         total_lai = total_lai if isinstance(total_lai, np.ndarray) else np.zeros((1,), dtype=float)
@@ -121,16 +123,18 @@ def _nearest_sampled_cell(indiv, j: int, i: int) -> int:
     return int(np.argmin(di))
 
 
-def plot_top3_species_distributions(eco,
-                                    grid,
-                                    indiv=None,
-                                    *,
-                                    lat_deg: float,
-                                    lon_deg: float,
-                                    nbins: int = 24,
-                                    neigh_radius: int = 1,
-                                    save_path: Optional[str] = None,
-                                    title: Optional[str] = None):
+def plot_top3_species_distributions(
+    eco,
+    grid,
+    indiv=None,
+    *,
+    lat_deg: float,
+    lon_deg: float,
+    nbins: int = 24,
+    neigh_radius: int = 1,
+    save_path: Optional[str] = None,
+    title: Optional[str] = None,
+):
     """
     Plot a 3x4 panel (12 subplots) for the top-3 species (by LAI at target cell):
       per species (row):
@@ -172,10 +176,15 @@ def plot_top3_species_distributions(eco,
     JJ, II = np.meshgrid(jj, ii, indexing="ij")  # [Nh, Nw]
 
     # Sample-based prefetch (if available)
-    has_samples = (indiv is not None) and hasattr(indiv, "indiv_cell_index") and hasattr(indiv, "indiv_species_id") and hasattr(indiv, "indiv_E_day")
+    has_samples = (
+        (indiv is not None)
+        and hasattr(indiv, "indiv_cell_index")
+        and hasattr(indiv, "indiv_species_id")
+        and hasattr(indiv, "indiv_E_day")
+    )
     if has_samples:
         cidx = _nearest_sampled_cell(indiv, j0, i0)
-        cell_mask = (indiv.indiv_cell_index == cidx)
+        cell_mask = indiv.indiv_cell_index == cidx
         sp_id = indiv.indiv_species_id
         E_day = indiv.indiv_E_day  # note: reset to 0 at day-end
     else:
@@ -185,9 +194,15 @@ def plot_top3_species_distributions(eco,
 
     # Species-level gene vectors (alloc_root, leaf_area_per_energy, lifespan_days)
     S_guess = len(genes_list)
-    alloc_root_vec = np.array([float(getattr(g, "alloc_root", 0.3)) for g in genes_list], dtype=float)
-    leaf_per_E_vec = np.array([float(getattr(g, "leaf_area_per_energy", 1.0e-6)) for g in genes_list], dtype=float)
-    lifespan_vec = np.array([float(getattr(g, "lifespan_days", 365.0)) for g in genes_list], dtype=float)
+    alloc_root_vec = np.array(
+        [float(getattr(g, "alloc_root", 0.3)) for g in genes_list], dtype=float
+    )
+    leaf_per_E_vec = np.array(
+        [float(getattr(g, "leaf_area_per_energy", 1.0e-6)) for g in genes_list], dtype=float
+    )
+    lifespan_vec = np.array(
+        [float(getattr(g, "lifespan_days", 365.0)) for g in genes_list], dtype=float
+    )
 
     # Cell area (for absolute leaf area if needed)
     A_cell = _cell_area_m2(grid, j0)
@@ -198,7 +213,9 @@ def plot_top3_species_distributions(eco,
 
         # 1) Canopy height distribution (neighborhood) using species-resolved height map
         try:
-            Hs_map = _species_height_map(pop, s, H_scale=float(os.getenv("QD_ECO_HEIGHT_SCALE_M", "10.0")))
+            Hs_map = _species_height_map(
+                pop, s, H_scale=float(os.getenv("QD_ECO_HEIGHT_SCALE_M", "10.0"))
+            )
         except Exception:
             Hs_map = _species_height_map(pop, s, H_scale=10.0)
         H_neigh = Hs_map[JJ, II].ravel() if Hs_map is not None else np.array([], dtype=float)
@@ -248,7 +265,9 @@ def plot_top3_species_distributions(eco,
     if title:
         fig.suptitle(title, fontsize=14)
     else:
-        fig.suptitle(f"Top-3 species distributions at ({lat_deg:.2f}°, {lon_deg:.2f}°)", fontsize=14)
+        fig.suptitle(
+            f"Top-3 species distributions at ({lat_deg:.2f}°, {lon_deg:.2f}°)", fontsize=14
+        )
 
     if save_path is not None:
         try:

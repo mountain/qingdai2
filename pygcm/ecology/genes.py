@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import List, Tuple, Optional
 import os
-import math
+from dataclasses import dataclass, field
+
 import numpy as np
 
 
 @dataclass
 class Peak:
     """Gaussian absorption peak parameters in nm-domain."""
+
     center_nm: float
     width_nm: float
     height: float  # 0..1
@@ -29,19 +29,20 @@ class Genes:
     - gdd_germinate: degree-day threshold for seed->growing transition (K·day)
     - lifespan_days: hard cap on age (days)
     """
+
     identity: str = "grass"
     alloc_root: float = 0.3
     alloc_stem: float = 0.2
     alloc_leaf: float = 0.5
     leaf_area_per_energy: float = 2.0e-3
-    absorption_peaks: List[Peak] = field(default_factory=list)
+    absorption_peaks: list[Peak] = field(default_factory=list)
     drought_tolerance: float = 0.3
     gdd_germinate: float = 80.0
     lifespan_days: int = 365
-    provenance: Optional[str] = None
+    provenance: str | None = None
 
     @staticmethod
-    def from_env(prefix: str = "QD_ECO_GENE_") -> "Genes":
+    def from_env(prefix: str = "QD_ECO_GENE_") -> Genes:
         """
         Build a default 'grass-like' gene from environment variables.
 
@@ -49,6 +50,7 @@ class Genes:
             QD_ECO_GENE_PEAKS="450:40:0.6, 680:30:0.8"
         """
         ident = os.getenv(prefix + "IDENTITY", "grass").strip()
+
         def f(name: str, default: float) -> float:
             try:
                 return float(os.getenv(prefix + name, str(default)))
@@ -56,7 +58,7 @@ class Genes:
                 return default
 
         peaks_env = os.getenv(prefix + "PEAKS", "").strip()
-        peaks: List[Peak] = []
+        peaks: list[Peak] = []
         if peaks_env:
             parts = peaks_env.split(",")
             for p in parts:
@@ -106,7 +108,7 @@ def absorbance_from_genes(bands, genes: Genes) -> np.ndarray:
         if pk.width_nm <= 0 or pk.height <= 0:
             continue
         # Gaussian peak
-        A += pk.height * np.exp(-((lam_b - pk.center_nm) ** 2) / (2 * (pk.width_nm ** 2)))
+        A += pk.height * np.exp(-((lam_b - pk.center_nm) ** 2) / (2 * (pk.width_nm**2)))
     # Clip to [0,1]
     return np.clip(A, 0.0, 1.0)
 

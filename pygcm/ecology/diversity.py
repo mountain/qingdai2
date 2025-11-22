@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def _get_species_lai_SK(eco) -> tuple[np.ndarray | None, int, int]:
@@ -40,7 +41,7 @@ def compute_alpha_eff_map(L_s: np.ndarray, land_mask: np.ndarray) -> np.ndarray:
     S, H, W = L_s.shape
     L_tot = np.sum(L_s, axis=0)  # [H, W]
     alpha_map = np.full((H, W), np.nan, dtype=float)
-    land = (land_mask == 1)
+    land = land_mask == 1
     mask = land & (L_tot > 0)
     if np.any(mask):
         # Build p over masked indices efficiently
@@ -66,7 +67,7 @@ def compute_whittaker_beta(L_s: np.ndarray, land_mask: np.ndarray, lat_mesh: np.
     Returns dict with alpha_mean, gamma_eff, beta_whittaker.
     """
     alpha_map = compute_alpha_eff_map(L_s, land_mask)
-    land = (land_mask == 1)
+    land = land_mask == 1
     w = _area_weights(lat_mesh)
     w_sum_land = float(np.sum(w[land])) + 1e-15
     w_norm = w / w_sum_land
@@ -85,7 +86,12 @@ def compute_whittaker_beta(L_s: np.ndarray, land_mask: np.ndarray, lat_mesh: np.
     gamma_eff = float(np.exp(H_gamma))
 
     beta_w = float(gamma_eff / max(alpha_mean, 1e-12))
-    return {"alpha_mean": alpha_mean, "gamma_eff": gamma_eff, "beta_whittaker": beta_w, "alpha_map": alpha_map}
+    return {
+        "alpha_mean": alpha_mean,
+        "gamma_eff": gamma_eff,
+        "beta_whittaker": beta_w,
+        "alpha_map": alpha_map,
+    }
 
 
 def compute_local_bray_curtis(L_s: np.ndarray, land_mask: np.ndarray) -> np.ndarray:
@@ -96,7 +102,7 @@ def compute_local_bray_curtis(L_s: np.ndarray, land_mask: np.ndarray) -> np.ndar
     Returns map with NaN over ocean.
     """
     S, H, W = L_s.shape
-    land = (land_mask == 1)
+    land = land_mask == 1
     # Precompute sums per cell
     sum_a = np.sum(L_s, axis=0)  # [H, W]
     # Prepare neighbor shifts: up, down, left, right (with periodic longitude)
@@ -110,7 +116,7 @@ def compute_local_bray_curtis(L_s: np.ndarray, land_mask: np.ndarray) -> np.ndar
         j_src = np.arange(H)
         i_src = np.arange(W)
         j_nbr = np.clip(j_src[:, None] + dj, 0, H - 1)  # [H,1]
-        i_nbr = (i_src[None, :] + di) % W               # [1,W]
+        i_nbr = (i_src[None, :] + di) % W  # [1,W]
 
         # Broadcast neighbor fields [S,H,W] -> [S,H,W] with shifted indices
         L_n = L_s[:, j_nbr, i_nbr]  # [S,H,W]
@@ -135,20 +141,28 @@ def compute_local_bray_curtis(L_s: np.ndarray, land_mask: np.ndarray) -> np.ndar
     return bc_mean
 
 
-def plot_diversity_maps(grid, land_mask, t_days: float, outdir: str,
-                        alpha_map: np.ndarray,
-                        bc_local: np.ndarray,
-                        beta_whittaker: float,
-                        alpha_mean: float,
-                        gamma_eff: float) -> None:
+def plot_diversity_maps(
+    grid,
+    land_mask,
+    t_days: float,
+    outdir: str,
+    alpha_map: np.ndarray,
+    bc_local: np.ndarray,
+    beta_whittaker: float,
+    alpha_mean: float,
+    gamma_eff: float,
+) -> None:
     os.makedirs(outdir, exist_ok=True)
     # 1) Alpha (effective species) map
     fig, ax = plt.subplots(1, 1, figsize=(10, 4.5), constrained_layout=True)
-    levels = np.linspace(0, np.nanmax(alpha_map[land_mask == 1]) if np.any(np.isfinite(alpha_map)) else 1.0, 16)
+    levels = np.linspace(
+        0, np.nanmax(alpha_map[land_mask == 1]) if np.any(np.isfinite(alpha_map)) else 1.0, 16
+    )
     cs = ax.contourf(grid.lon, grid.lat, alpha_map, levels=levels, cmap="viridis")
     ax.contour(grid.lon, grid.lat, land_mask, levels=[0.5], colors="black", linewidths=0.6)
     ax.set_title(f"Alpha diversity (effective S) — Day {t_days:.2f}")
-    ax.set_xlabel("Longitude"); ax.set_ylabel("Latitude")
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
     fig.colorbar(cs, ax=ax, label="Effective species number")
     plt.savefig(os.path.join(outdir, f"alpha_effective_day_{t_days:05.1f}.png"), dpi=140)
     plt.close(fig)
@@ -159,13 +173,16 @@ def plot_diversity_maps(grid, land_mask, t_days: float, outdir: str,
     cs = ax.contourf(grid.lon, grid.lat, bc_local, levels=levels, cmap="magma")
     ax.contour(grid.lon, grid.lat, land_mask, levels=[0.5], colors="black", linewidths=0.6)
     ax.set_title(f"Local beta (Bray–Curtis to neighbors) — Day {t_days:.2f}")
-    ax.set_xlabel("Longitude"); ax.set_ylabel("Latitude")
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
     fig.colorbar(cs, ax=ax, label="Bray–Curtis (0..1)")
     plt.savefig(os.path.join(outdir, f"beta_local_braycurtis_day_{t_days:05.1f}.png"), dpi=140)
     plt.close(fig)
 
     # 3) Text summary
-    with open(os.path.join(outdir, f"diversity_summary_day_{t_days:05.1f}.txt"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(outdir, f"diversity_summary_day_{t_days:05.1f}.txt"), "w", encoding="utf-8"
+    ) as f:
         f.write(f"Day: {t_days:.2f}\n")
         f.write(f"Whittaker beta (β = γ/ᾱ): {beta_whittaker:.4f}\n")
         f.write(f"  alpha_mean (ᾱ): {alpha_mean:.4f}\n")
@@ -203,7 +220,10 @@ def compute_and_plot(grid, eco, land_mask: np.ndarray, t_days: float, base_outpu
         wh = compute_whittaker_beta(L_s, land_mask, grid.lat_mesh)
         # Plots + files
         plot_diversity_maps(
-            grid, land_mask, t_days, outdir,
+            grid,
+            land_mask,
+            t_days,
+            outdir,
             alpha_map=alpha_map,
             bc_local=bc_local,
             beta_whittaker=wh["beta_whittaker"],
