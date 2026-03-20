@@ -89,7 +89,7 @@ class DemoRelaxEngine:
         Accepts optional:
           - h_eq: ndarray, equilibrium target for height relaxation
         """
-        h_eq = kwargs.get("h_eq", None)
+        h_eq = kwargs.get("h_eq")
 
         du_dt = self._relax(u, self.p.tau_relax_u_s) + self._hyperdiff(u, self.p.k4_u)
         dv_dt = self._relax(v, self.p.tau_relax_v_s) + self._hyperdiff(v, self.p.k4_v)

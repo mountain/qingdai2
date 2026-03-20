@@ -82,7 +82,11 @@ def normalize_fluxes(fluxes, ref: np.ndarray) -> tuple[np.ndarray, np.ndarray, n
     if fluxes is None:
         zeros = np.zeros_like(ref)
         return zeros, zeros, zeros
-    evap_flux = np.zeros_like(ref) if fluxes.evap_flux is None else np.maximum(0.0, np.asarray(fluxes.evap_flux))
+    evap_flux = (
+        np.zeros_like(ref)
+        if fluxes.evap_flux is None
+        else np.maximum(0.0, np.asarray(fluxes.evap_flux))
+    )
     Q_net = np.where(np.isfinite(np.asarray(fluxes.Qnet)), np.asarray(fluxes.Qnet), 0.0)
     precip_flux = (
         np.zeros_like(ref)

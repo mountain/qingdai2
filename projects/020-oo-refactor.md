@@ -1,6 +1,6 @@
 # 项目 P020（修订版 v1.2）：架构重构（面向对象 + 可测试 + 渐进迁移）
 
-状态：Phase 0→Phase 4 已完成，Phase 5 启动中（2026‑03‑21）  
+状态：Phase 0→Phase 5 已完成（2026‑03‑21）  
 作者：Cline（AI 软件工程师）  
 修订：v1.2 合入评审建议（Pydantic 校验 / 依赖注入 / Façade API 合约 / JAX‑First 设计）  
 关联文档与代码：
@@ -316,6 +316,14 @@ class QingdaiWorld:
 - 阶段 5（JAX 互操作 + 性能与基准，5–7 天）
   - 与 projects/016 的 `xp` 后端对齐；核心算子加 `@jit`；
   - 端到端对比基准、内存占用与步时日志。
+  - 本批完成：补齐 JAX 运行策略开关（含 CPU/Metal 可选启用），并保持无 JAX 环境下稳定回退。
+  - 本批完成：增强 `scripts/benchmark_jax.py`，输出内存峰值与结构化 JSON 基准结果。
+  - 本批完成：新增 Phase5 回归测试（benchmark JSON 输出与 JAX 兼容层开关导入稳定性）。
+  - Phase 5 验收清单（收口）：
+    - [x] JAX/Numpy 路径可通过开关稳定切换，且默认保留安全回退
+    - [x] 基准脚本输出总时长/步时/内存峰值，并支持 JSON 产物
+    - [x] CI 本地回归覆盖新增 Phase5 核心契约测试
+    - [x] P016/P020/README 状态与运行说明同步
 
 每阶段均包含“止损点”：任何异常可回滚开关（QD_USE_OO=0）；保持产线可运行。
 
@@ -461,6 +469,7 @@ class QingdaiWorld:
 - 2026‑03‑21：v1.23 推进 Phase 4 第五批：为 `world_diagnostics` 增加 schema 版本化校验与可选 JSON 落盘（`QD_OO_WORLD_DIAG_*`），补齐诊断 schema/落盘回归测试。
 - 2026‑03‑21：v1.24 推进 Phase 4 第六批：新增 `WorldDiagnosticsDocument` 等 dataclass contract 与 `world_diagnostics_from_dict/make_world_diagnostics_document`，引入严格字段校验与可选 backward-compat 解析策略。
 - 2026‑03‑21：v1.25 完成 Phase 4 收口并切换 Phase 5：补齐 Phase 4 验收清单并将项目状态更新为“Phase 5 启动中”。
+- 2026‑03‑21：v1.26 完成 Phase 5 收口：完善 JAX 运行策略（`QD_JAX_ALLOW_CPU`）、增强 `benchmark_jax.py` 的内存峰值与 JSON 输出，并补齐 Phase5 回归测试与文档同步。
 
 ---
 

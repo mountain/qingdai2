@@ -1,5 +1,4 @@
 import numpy as np
-
 from pygcm.hydrology import HydrologyParams, snowpack_step
 
 

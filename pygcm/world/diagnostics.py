@@ -30,7 +30,6 @@ except Exception:
 
 from pygcm import constants
 
-
 WORLD_DIAGNOSTICS_SCHEMA_VERSION = 1
 
 
@@ -326,9 +325,8 @@ def world_diagnostics_from_dict(
         summary_raw = dict(doc["summary"])
         last_step_raw = doc["last_step"]
         samples_raw = list(doc["samples"])
-    if schema_version != int(expected_schema_version):
-        if not allow_backward_compat:
-            raise ValueError("world_diagnostics schema_version mismatch")
+    if schema_version != int(expected_schema_version) and not allow_backward_compat:
+        raise ValueError("world_diagnostics schema_version mismatch")
     summary_required = {
         "energy_mean_abs_toa",
         "energy_mean_abs_sfc",

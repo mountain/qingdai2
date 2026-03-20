@@ -1,5 +1,4 @@
 import numpy as np
-
 from pygcm.world.orchestrator_spec import build_world_orchestrator_spec
 
 

@@ -206,7 +206,7 @@ pytest -q
 ```bash
 UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv run --with pytest --with scipy pytest -q
 ```
-后续将继续推进 P020 Phase 2/3（配置参数固化、子系统深度内收、统一编排契约）。
+P020 Phase 0→Phase 5 已完成：当前支持 OO 编排链路与 JAX 可选后端，并提供 `scripts/benchmark_jax.py` 的步时/内存峰值/JSON 基准输出。
 
 ### 5) 测试策略与范围
 

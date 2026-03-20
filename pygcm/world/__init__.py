@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 # Typing-only import to keep mypy happy without requiring runtime import
 if TYPE_CHECKING:  # pragma: no cover
@@ -107,8 +107,12 @@ class SimConfig:
                 "world_diagnostics_enable": bool(self.world_diagnostics_enable),
                 "world_diagnostics_json": str(self.world_diagnostics_json),
                 "world_diagnostics_schema_version": int(self.world_diagnostics_schema_version),
-                "world_diagnostics_strict_validation": bool(self.world_diagnostics_strict_validation),
-                "world_diagnostics_allow_backward_compat": bool(self.world_diagnostics_allow_backward_compat),
+                "world_diagnostics_strict_validation": bool(
+                    self.world_diagnostics_strict_validation
+                ),
+                "world_diagnostics_allow_backward_compat": bool(
+                    self.world_diagnostics_allow_backward_compat
+                ),
             },
         }
 
@@ -118,6 +122,7 @@ class SimConfig:
             if v is None:
                 return None
             return float(str(v))
+
         if "domain" in doc and "runtime_control" in doc:
             d = doc["domain"]
             r = doc["runtime_control"]
@@ -142,8 +147,12 @@ class SimConfig:
                 world_diagnostics_enable=bool(r.get("world_diagnostics_enable", True)),
                 world_diagnostics_json=str(r.get("world_diagnostics_json", "")),
                 world_diagnostics_schema_version=int(r.get("world_diagnostics_schema_version", 1)),
-                world_diagnostics_strict_validation=bool(r.get("world_diagnostics_strict_validation", True)),
-                world_diagnostics_allow_backward_compat=bool(r.get("world_diagnostics_allow_backward_compat", False)),
+                world_diagnostics_strict_validation=bool(
+                    r.get("world_diagnostics_strict_validation", True)
+                ),
+                world_diagnostics_allow_backward_compat=bool(
+                    r.get("world_diagnostics_allow_backward_compat", False)
+                ),
             )
         total_years_val = doc.get("total_years")
         sim_days_val = doc.get("sim_days")
@@ -168,8 +177,12 @@ class SimConfig:
             world_diagnostics_enable=bool(doc.get("world_diagnostics_enable", True)),
             world_diagnostics_json=str(doc.get("world_diagnostics_json", "")),
             world_diagnostics_schema_version=int(doc.get("world_diagnostics_schema_version", 1)),
-            world_diagnostics_strict_validation=bool(doc.get("world_diagnostics_strict_validation", True)),
-            world_diagnostics_allow_backward_compat=bool(doc.get("world_diagnostics_allow_backward_compat", False)),
+            world_diagnostics_strict_validation=bool(
+                doc.get("world_diagnostics_strict_validation", True)
+            ),
+            world_diagnostics_allow_backward_compat=bool(
+                doc.get("world_diagnostics_allow_backward_compat", False)
+            ),
         )
 
     @classmethod
@@ -191,6 +204,7 @@ class SimConfig:
                 return float(os.getenv(name, default))
             except Exception:
                 return float(default)
+
         def _fopt(name: str) -> float | None:
             raw = os.getenv(name, "").strip()
             if raw in ("", "None", "none", "null"):
@@ -199,6 +213,7 @@ class SimConfig:
                 return float(raw)
             except Exception:
                 return None
+
         def _s(name: str, default: str = "") -> str:
             try:
                 return str(os.getenv(name, default))
@@ -227,7 +242,9 @@ class SimConfig:
             world_diagnostics_json=_s("QD_OO_WORLD_DIAG_JSON", "").strip(),
             world_diagnostics_schema_version=_int("QD_OO_WORLD_DIAG_SCHEMA_VERSION", "1"),
             world_diagnostics_strict_validation=_ibool("QD_OO_WORLD_DIAG_STRICT_VALIDATE", "1"),
-            world_diagnostics_allow_backward_compat=_ibool("QD_OO_WORLD_DIAG_ALLOW_BACKCOMPAT", "0"),
+            world_diagnostics_allow_backward_compat=_ibool(
+                "QD_OO_WORLD_DIAG_ALLOW_BACKCOMPAT", "0"
+            ),
         )
 
 
@@ -313,16 +330,19 @@ class PhysicsParams:
                 return float(os.getenv(name, default))
             except Exception:
                 return float(default)
+
         def _i(name: str, default: str) -> int:
             try:
                 return int(os.getenv(name, default))
             except Exception:
                 return int(default)
+
         def _b(name: str, default: str) -> bool:
             try:
                 return int(os.getenv(name, default)) == 1
             except Exception:
                 return default == "1"
+
         def _fopt(name: str) -> float | None:
             raw = os.getenv(name, "").strip()
             if raw in ("", "None", "none", "null"):
@@ -602,35 +622,37 @@ class QingdaiWorld:
         return self.current_state
 
     def run(self, n_steps: int | None = None, duration_days: float | None = None) -> None:
-        import os
         import json
+
         import numpy as np
+
         from pygcm import constants as const
-        from pygcm.world.state import zeros_world_state_from_grid
+        from pygcm import energy as _energy
+        from pygcm import humidity as hum
+        from pygcm import hydrology as hydro
+        from pygcm.forcing import ThermalForcing
+        from pygcm.orbital import OrbitalSystem
+        from pygcm.topography import create_land_sea_mask, generate_base_properties
         from pygcm.world.atmos_orchestrator import ensure_atmos_orchestrator
-        from pygcm.world.hydrology_orchestrator import ensure_hydrology_orchestrator
-        from pygcm.world.ecology_orchestrator import ensure_ecology_orchestrator
-        from pygcm.world.routing_orchestrator import ensure_routing_orchestrator
-        from pygcm.world.orchestrator_spec import build_world_orchestrator_spec
         from pygcm.world.diagnostics import (
             make_world_diagnostics_document,
             validate_world_diagnostics,
             world_diagnostics_to_jsonable,
         )
-        from pygcm.world.ports import SurfaceToAtmosphere, ColumnProcessIn
+        from pygcm.world.ecology_orchestrator import ensure_ecology_orchestrator
+        from pygcm.world.hydrology_orchestrator import ensure_hydrology_orchestrator
+        from pygcm.world.ocean_orchestrator import ensure_ocean_orchestrator
+        from pygcm.world.orchestrator_spec import build_world_orchestrator_spec
+        from pygcm.world.ports import ColumnProcessIn, SurfaceToAtmosphere
+        from pygcm.world.routing_orchestrator import ensure_routing_orchestrator
+        from pygcm.world.state import zeros_world_state_from_grid
         from pygcm.world.world_step_ops import (
             compute_column_step,
             compute_energy_diag,
             normalize_fluxes,
             resolve_total_seconds,
         )
-        from pygcm.topography import create_land_sea_mask, generate_base_properties
-        from pygcm.forcing import ThermalForcing
-        from pygcm.orbital import OrbitalSystem
-        from pygcm.world.ocean_orchestrator import ensure_ocean_orchestrator
-        from pygcm import hydrology as hydro
-        from pygcm import humidity as hum
-        from pygcm import energy as _energy
+
         grid = self.grid
         if grid is None:
             return
@@ -665,7 +687,7 @@ class QingdaiWorld:
         Cs_land = float(pp.cs_land)
         Cs_ice = float(pp.cs_ice)
         C_s_map = np.where(land_mask == 1, Cs_land, Cs_ocean).astype(float)
-        atm = ensure_atmos_orchestrator(self.atmos)
+        atm = cast(Any, ensure_atmos_orchestrator(self.atmos))
         self.atmos = atm
         orbital = OrbitalSystem()
         forcing = ThermalForcing(grid, orbital)
@@ -756,16 +778,16 @@ class QingdaiWorld:
         )
         t0 = 0.0
         steps = int(max(1, total_seconds // dt))
-        ocean = ensure_ocean_orchestrator(self.ocean)
+        ocean = cast(Any, ensure_ocean_orchestrator(self.ocean))
         self.ocean = ocean
         ocean.configure(spec=orchestrator_spec)
-        hydrology = ensure_hydrology_orchestrator(self.hydrology)
+        hydrology = cast(Any, ensure_hydrology_orchestrator(self.hydrology))
         self.hydrology = hydrology
         hydrology.configure(spec=orchestrator_spec)
-        routing = ensure_routing_orchestrator(self.routing)
+        routing = cast(Any, ensure_routing_orchestrator(self.routing))
         self.routing = routing
         routing.configure(spec=orchestrator_spec)
-        ecology = ensure_ecology_orchestrator(self.ecology)
+        ecology = cast(Any, ensure_ecology_orchestrator(self.ecology))
         self.ecology = ecology
         ecology.configure(spec=orchestrator_spec)
         energy_abs_toa = 0.0
@@ -927,10 +949,10 @@ class QingdaiWorld:
                 world_diag_samples.append(last_world_diag)
             state.swap_all()
             self.current_state.t_seconds += dt
-        energy_mean_abs_toa = (energy_abs_toa / max(1, energy_count))
-        energy_mean_abs_sfc = (energy_abs_sfc / max(1, energy_count))
-        energy_mean_abs_atm = (energy_abs_atm / max(1, energy_count))
-        water_mean_abs_residual = (water_abs_residual / max(1, water_count))
+        energy_mean_abs_toa = energy_abs_toa / max(1, energy_count)
+        energy_mean_abs_sfc = energy_abs_sfc / max(1, energy_count)
+        energy_mean_abs_atm = energy_abs_atm / max(1, energy_count)
+        water_mean_abs_residual = water_abs_residual / max(1, water_count)
         self.m4_metrics = {
             "energy_mean_abs_toa": energy_mean_abs_toa,
             "energy_mean_abs_sfc": energy_mean_abs_sfc,
@@ -972,10 +994,13 @@ class QingdaiWorld:
         )
         try:
             import numpy as _np
+
             u = _np.asarray(state.atmos.u.read)
             v = _np.asarray(state.atmos.v.read)
             h = _np.asarray(state.atmos.h.read)
-            print(f"[P020] OO world completed {steps} step(s) | max|u|={_np.max(_np.abs(u)):.2f} m/s | max|v|={_np.max(_np.abs(v)):.2f} m/s | max|h|={_np.max(_np.abs(h)):.2f}")
+            print(
+                f"[P020] OO world completed {steps} step(s) | max|u|={_np.max(_np.abs(u)):.2f} m/s | max|v|={_np.max(_np.abs(v)):.2f} m/s | max|h|={_np.max(_np.abs(h)):.2f}"
+            )
         except Exception:
             pass
 

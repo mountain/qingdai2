@@ -28,12 +28,15 @@ class AtmosphereOrchestrator:
             )
             self.backend = Atmosphere(engine=engine)
         try:
-            if hasattr(self.backend, "coupler") and getattr(self.backend, "coupler", None) is not None:
-                if hasattr(self.backend.coupler, "set_external_params"):
-                    self.backend.coupler.set_external_params(
-                        humidity_params=aspec.humidity_params,
-                        energy_params=aspec.energy_params,
-                    )
+            if (
+                hasattr(self.backend, "coupler")
+                and getattr(self.backend, "coupler", None) is not None
+                and hasattr(self.backend.coupler, "set_external_params")
+            ):
+                self.backend.coupler.set_external_params(
+                    humidity_params=aspec.humidity_params,
+                    energy_params=aspec.energy_params,
+                )
         except Exception:
             pass
 

@@ -127,9 +127,7 @@ def build_world_orchestrator_spec(
             network_nc_path=str(routing_network_nc_path),
             dt_hydro_hours=float(routing_dt_hydro_hours),
             treat_lake_as_water=bool(routing_treat_lake_as_water),
-            alpha_lake=(
-                None if routing_alpha_lake is None else float(routing_alpha_lake)
-            ),
+            alpha_lake=(None if routing_alpha_lake is None else float(routing_alpha_lake)),
             diag=bool(routing_diag),
         ),
     )

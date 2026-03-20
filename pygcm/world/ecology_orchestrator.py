@@ -61,7 +61,11 @@ class EcologyOrchestrator:
         land_mask = self.land_mask if self.land_mask is not None else np.zeros_like(albedo)
         out = np.where(
             land_mask == 1,
-            np.clip((1.0 - self.lai_albedo_weight) * albedo + self.lai_albedo_weight * alpha_mix, 0.0, 1.0),
+            np.clip(
+                (1.0 - self.lai_albedo_weight) * albedo + self.lai_albedo_weight * alpha_mix,
+                0.0,
+                1.0,
+            ),
             albedo,
         )
         self._diag["last_albedo_mean"] = float(np.nanmean(out))
@@ -168,8 +172,14 @@ class _LegacyEcologyAdapter:
 def ensure_ecology_orchestrator(eco_obj) -> EcologyOrchestrator | object:
     if eco_obj is None:
         return EcologyOrchestrator()
-    if hasattr(eco_obj, "configure") and hasattr(eco_obj, "apply_albedo") and hasattr(eco_obj, "step_daily_if_needed"):
+    if (
+        hasattr(eco_obj, "configure")
+        and hasattr(eco_obj, "apply_albedo")
+        and hasattr(eco_obj, "step_daily_if_needed")
+    ):
         return eco_obj
     if hasattr(eco_obj, "step_subdaily") and hasattr(eco_obj, "step_daily"):
         return _LegacyEcologyAdapter(eco_obj)
-    raise TypeError("ecology object must provide orchestrator interface or legacy step_subdaily+step_daily")
+    raise TypeError(
+        "ecology object must provide orchestrator interface or legacy step_subdaily+step_daily"
+    )

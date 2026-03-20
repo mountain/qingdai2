@@ -147,7 +147,7 @@ class LegacySpectralBackend(AtmosphereBackend):
             self.gcm.h_ice = xp.maximum(xp.asarray(kwargs["h_ice"]), 0.0)
 
         # 2) Advance legacy engine
-        Teq = kwargs.get("Teq", None)
+        Teq = kwargs.get("Teq")
         if Teq is None:
             # If no forcing is provided, do a neutral step (no-op forcing)
             # by passing a zero field of same shape as h (legacy API requires a Teq).

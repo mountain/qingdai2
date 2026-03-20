@@ -1,5 +1,4 @@
 import pytest
-
 from pygcm.world import SimConfig
 
 

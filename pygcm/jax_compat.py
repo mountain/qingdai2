@@ -50,11 +50,14 @@ if _JAX_ENABLED:
                 _JAX_BACKEND = _JAX.default_backend() or "unknown"
         except Exception:
             _JAX_BACKEND = "unknown"
-        # Enable only on real accelerators unless forced
-        if (_JAX_BACKEND in ("gpu", "cuda", "tpu")) or (os.getenv("QD_JAX_FORCE", "0") == "1"):
+        allow_cpu = os.getenv("QD_JAX_ALLOW_CPU", "0") == "1"
+        if (
+            (_JAX_BACKEND in ("gpu", "cuda", "tpu"))
+            or (os.getenv("QD_JAX_FORCE", "0") == "1")
+            or (allow_cpu and _JAX_BACKEND in ("cpu", "metal"))
+        ):
             _JAX_ENABLED = True
         else:
-            # Disable JAX path; fallback to NumPy/SciPy as default for cpu/metal
             _JAX_ENABLED = False
     except Exception:
         # If import fails, silently disable JAX

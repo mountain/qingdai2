@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -17,7 +18,7 @@ class HydrologyOrchestrator:
     def __init__(self, backend=None) -> None:
         self.backend = backend
         self.land_mask: np.ndarray | None = None
-        self.hparams = None
+        self.hparams: Any | None = None
         self._diag: dict[str, float] = {
             "runoff_mean": 0.0,
             "evap_mean": 0.0,

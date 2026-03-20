@@ -1180,7 +1180,10 @@ def main():
             try:
                 world = QingdaiWorld.create_default()
                 print("[P020] QD_USE_OO=1 → QingdaiWorld OO orchestrator active (Phase 1+).")
-                world.run()
+                if OO_STRICT:
+                    world.run(n_steps=1)
+                else:
+                    world.run()
             except Exception as _wo:
                 print(f"[P020] world OO run raised: {_wo}")
             if OO_STRICT:

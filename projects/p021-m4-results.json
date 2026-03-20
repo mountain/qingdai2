@@ -5,7 +5,7 @@
     "energy_mean_abs_atm": 300.9043591388058,
     "water_mean_abs_residual": 3.8095577132426174e-18,
     "steps": 48,
-    "elapsed_seconds": 0.29256666701985523,
+    "elapsed_seconds": 0.3111195840174332,
     "days": 0.2
   },
   "oo_thresholds": {
@@ -19,7 +19,7 @@
     "oo": {
       "mode": "oo",
       "returncode": 0,
-      "elapsed_seconds": 0.36944362497888505,
+      "elapsed_seconds": 0.38735899998573586,
       "tail": [
         "[JAX] Acceleration enabled: False (toggle via QD_USE_JAX=1; platform via QD_JAX_PLATFORM=cpu|gpu|tpu)",
         "[P020] SimConfig snapshot: {'schema_version': 1, 'domain': {'grid': {'n_lat': 32, 'n_lon': 64}, 'subsystems': {'use_ocean': True, 'use_ecology': False, 'use_routing': True}, 'time_step': {'dt_seconds': 300.0}}, 'runtime_control': {'oo_config_diag': True, 'oo_metadata_enable': True, 'oo_metadata_json': '', 'total_years': None, 'sim_days': 0.02, 'default_orbit_fraction': 0.02, 'routing_netcdf': 'data/hydrology.nc', 'routing_dt_hydro_hours': 6.0, 'routing_treat_lake_as_water': True, 'routing_alpha_lake': None, 'routing_diag': True, 'world_diagnostics_enable': True, 'world_diagnostics_json': '', 'world_diagnostics_schema_version': 1, 'world_diagnostics_strict_validation': True, 'world_diagnostics_allow_backward_compat': False}}",
@@ -35,7 +35,7 @@
     "legacy": {
       "mode": "legacy",
       "returncode": 0,
-      "elapsed_seconds": 11.235474792018067,
+      "elapsed_seconds": 11.350758249987848,
       "tail": [
         "Final state diagnostics:",
         "  Max absolute zonal wind (u): 133.67 m/s",
@@ -48,14 +48,14 @@
       ],
       "stderr_tail": [
         "  0%|          | 0/5 [00:00<?, ?it/s]",
-        " 20%|██        | 1/5 [00:02<00:08,  2.23s/it]",
-        " 40%|████      | 2/5 [00:04<00:06,  2.19s/it]",
-        " 60%|██████    | 3/5 [00:06<00:04,  2.12s/it]",
-        " 80%|████████  | 4/5 [00:08<00:02,  2.13s/it]",
-        "100%|██████████| 5/5 [00:10<00:00,  2.18s/it]",
-        "100%|██████████| 5/5 [00:10<00:00,  2.17s/it]"
+        " 20%|██        | 1/5 [00:02<00:09,  2.27s/it]",
+        " 40%|████      | 2/5 [00:04<00:06,  2.21s/it]",
+        " 60%|██████    | 3/5 [00:06<00:04,  2.13s/it]",
+        " 80%|████████  | 4/5 [00:08<00:02,  2.15s/it]",
+        "100%|██████████| 5/5 [00:10<00:00,  2.20s/it]",
+        "100%|██████████| 5/5 [00:10<00:00,  2.19s/it]"
       ]
     },
-    "legacy_over_oo_ratio": 30.41187892377413
+    "legacy_over_oo_ratio": 29.302941845693088
   }
 }

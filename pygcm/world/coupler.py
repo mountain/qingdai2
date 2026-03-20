@@ -103,7 +103,7 @@ class Coupler:
         self.LV = float(getattr(constants, "LV", 2.5e6))
         try:
             if self._humidity_params is not None and hasattr(self._humidity_params, "L_v"):
-                self.LV = float(getattr(self._humidity_params, "L_v"))
+                self.LV = float(self._humidity_params.L_v)
         except Exception:
             pass
 
@@ -114,7 +114,7 @@ class Coupler:
             self._humidity_params = humidity_params
             try:
                 if hasattr(humidity_params, "L_v"):
-                    self.LV = float(getattr(humidity_params, "L_v"))
+                    self.LV = float(humidity_params.L_v)
             except Exception:
                 pass
 

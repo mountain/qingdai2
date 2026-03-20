@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from pygcm.world.diagnostics import (
     make_world_diagnostics_document,
     validate_world_diagnostics,

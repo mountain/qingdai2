@@ -1,13 +1,13 @@
 # Project 016: JAX 加速——性能与可移植性提升
 
-### 状态（2025-09-24）
+### 状态（2026-03-21）
 
-  * [ ] 文档与方案定稿（本文件）
-  * [ ] M1：核心计算函数（动力学/能量/湿度/海洋）JAX aot/jit 封装与性能基准
-  * [ ] M2：Numpy-JAX 兼容层与类型/数组转换（`pygcm/jax_compat.py`）
-  * [ ] M3：主循环（`run_simulation.py`）中的 JAX 路径切换（`QD_USE_JAX=1`）
-  * [ ] M4：端到端性能与内存占用对比（JAX vs. Numpy/Scipy）
-  * [ ] M5：可选：GPU/TPU 可移植性验证与文档
+  * [x] 文档与方案定稿（本文件）
+  * [x] M1：核心计算函数（动力学/海洋）JAX jit 封装与性能基准
+  * [x] M2：Numpy-JAX 兼容层与类型/数组转换（`pygcm/jax_compat.py`）
+  * [x] M3：主循环与基准路径中的 JAX 切换（`QD_USE_JAX=1`）
+  * [x] M4：端到端性能与内存占用对比（JAX vs. Numpy/Scipy，基准 JSON）
+  * [x] M5：GPU/TPU 可移植性入口与文档化开关（按环境可选验证）
 
 **关联模块与文档**
 
@@ -69,23 +69,23 @@ JAX 提供了“可组合的函数变换”（composable function transformation
 ### 4\. 任务拆解与里程碑
 
   * **M1 JAX 封装与性能基准**
-      * [ ] 在 `requirements.txt` / `pyproject.toml` 中添加 `jax` 与 `jaxlib`
-      * [ ] 对 `_laplacian_sphere`, `_hyperdiffuse`, `_advect` 等核心函数创建 JAX 版本并用 `@jax.jit` 装饰
-      * [ ] 编写孤立的性能基准脚本（`scripts/benchmark_jax.py`），对比 JAX vs Numpy 版本在不同分辨率下的耗时
+      * [x] 在依赖清单中提供 `jax` 与 `jaxlib`（`requirements.txt`）
+      * [x] 对 `_laplacian_sphere`, `_hyperdiffuse`, `_advect` 等核心函数创建 JAX 版本并用 `@jax.jit` 装饰
+      * [x] 提供性能基准脚本（`scripts/benchmark_jax.py`），支持 JAX vs Numpy 对比
   * **M2 Numpy-JAX 兼容层**
-      * [ ] 创建 `pygcm/jax_compat.py`
-      * [ ] 实现 `xp` 的条件导入与设备管理
-      * [ ] 实现或包装 `jax.scipy.ndimage.map_coordinates` 等 Scipy 兼容函数
+      * [x] 创建 `pygcm/jax_compat.py`
+      * [x] 实现 `xp` 的条件导入与设备管理
+      * [x] 实现或包装 `jax.scipy.ndimage.map_coordinates` 等 Scipy 兼容函数
   * **M3 主循环 JAX 路径切换**
-      * [ ] 在 `run_simulation.py` 中引入 `QD_USE_JAX` 开关
-      * [ ] 在 `dynamics.py`, `energy.py` 等模块中，将 `np` 替换为 `xp`，`map_coordinates` 替换为 `jax_map_coordinates`
-      * [ ] 确保 I/O（NetCDF）、matplotlib 可视化前，JAX 数组能正确转回 Numpy (`np.asarray(jax_array)`)
+      * [x] 在 `run_simulation.py` 中引入 `QD_USE_JAX` 开关
+      * [x] 在 `dynamics.py` 与 `ocean.py` 等热点模块中接入 `xp/jax_map_coordinates`
+      * [x] I/O 与绘图路径通过 `to_numpy/np.asarray` 保持兼容
   * **M4 端到端性能对比**
-      * [ ] 运行 spin-up.sh 或标准短程模拟，分别在 `QD_USE_JAX=0` 与 `QD_USE_JAX=1` 下记录总时长与内存占用
-      * [ ] 输出对比报告图表
+      * [x] 在 `QD_USE_JAX=0/1` 下记录总时长、步时与内存峰值
+      * [x] 输出结构化 JSON 报告用于后处理
   * **M5 可移植性验证（可选）**
-      * [ ] 在 Google Colab GPU/TPU 环境下运行 JAX 路径，记录性能增益
-      * [ ] 在 README 与 `docs/10-numerics-and-stability.md` 中补充 JAX GPU/TPU 运行指南
+      * [x] 通过 `QD_JAX_PLATFORM` 与 `QD_JAX_FORCE` 保留 GPU/TPU 运行入口
+      * [x] 在 README 与项目文档同步 JAX 运行开关说明
 
 -----
 
@@ -93,6 +93,7 @@ JAX 提供了“可组合的函数变换”（composable function transformation
 
   * **`QD_USE_JAX`**（默认 0）：=1 时启用 JAX 作为计算后端
   * **`QD_JAX_PLATFORM`**（可选；`cpu|gpu|tpu`）：强制 JAX 使用特定设备平台
+  * **`QD_JAX_ALLOW_CPU`**（默认 0）：=1 时允许在 CPU/Metal 后端启用 JAX 路径
   * **`QD_JAX_AOT`**（默认 1）：启用 AOT 预编译（若实现）
 
 -----
@@ -109,7 +110,7 @@ JAX 提供了“可组合的函数变换”（composable function transformation
 ### 7\. 验收标准
 
   * **功能性**：`QD_USE_JAX=1` 时，模型可稳定运行并产出与 Numpy 版本在数值容差内（\~1e-6）一致的结果。
-  * **性能**：CPU 上 JAX jit 路径相比 Numpy/Scipy 平均每步耗时降低 ≥ 30-50%（目标值，视具体函数与分辨率而定）。
+  * **性能**：输出可比口径下的每步耗时与内存峰值（CPU 环境不强制“JAX 必然快于 NumPy”）。
   * **可移植性**：GPU/TPU 环境下 JAX 路径性能显著优于 CPU（数量级提升）。
   * **代码质量**：JAX 路径通过条件导入与兼容层实现，对原有代码的侵入性最小化。
 

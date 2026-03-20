@@ -372,6 +372,7 @@ CI 与回归
 - 2026‑03‑21：v1.22：配合 P020 Phase 4 第五批，`world_diagnostics` 新增 schema 校验与可选 JSON 落盘，确保 DBA 诊断输出可稳定被后处理脚本消费。
 - 2026‑03‑21：v1.23：配合 P020 Phase 4 第六批，`world_diagnostics` 引入 dataclass typed contract、严格字段校验与可选 backward-compat 解析，回归验证输出结构稳定。
 - 2026‑03‑21：v1.24：配合 P020 Phase 4 收口，确认 DBA 链路验收清单完成并进入 Phase 5（JAX 互操作 + 性能基准）阶段。
+- 2026‑03‑21：v1.25：配合 P020 Phase 5 收口，增强 JAX 基准脚本（步时/内存峰值/JSON）并补充 Phase5 回归，确认 DBA 链路在 JAX 可选后端下持续稳定。
 
 ## 12. M4 实测结果（2026‑03‑20）
 

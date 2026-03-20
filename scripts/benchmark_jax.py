@@ -20,7 +20,16 @@ import os
 import sys
 import time
 import argparse
+import json
+import tracemalloc
+from typing import Any
 import numpy as np
+resource = None
+try:
+    import resource as _resource
+    resource = _resource
+except Exception:
+    pass
 
 # Respect env backend selection BEFORE importing pygcm modules
 USE_JAX = int(os.getenv("QD_USE_JAX", "0")) == 1
@@ -40,7 +49,27 @@ from pygcm.ocean import WindDrivenSlabOcean
 from pygcm.jax_compat import is_enabled as JAX_IS_ENABLED, backend as JAX_BACKEND
 
 
-def run_benchmark(nlat: int, nlon: int, steps: int, dt: float, with_ocean: bool) -> None:
+def _memory_peak_mb() -> float:
+    py_peak = 0.0
+    try:
+        _, peak = tracemalloc.get_traced_memory()
+        py_peak = float(peak) / (1024.0 * 1024.0)
+    except Exception:
+        py_peak = 0.0
+    rss_peak = 0.0
+    if resource is not None:
+        try:
+            rss = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+            if sys.platform == "darwin":
+                rss_peak = rss / (1024.0 * 1024.0)
+            else:
+                rss_peak = rss / 1024.0
+        except Exception:
+            rss_peak = 0.0
+    return max(py_peak, rss_peak)
+
+
+def run_benchmark(nlat: int, nlon: int, steps: int, dt: float, with_ocean: bool) -> dict[str, Any]:
     print(f"[Benchmark] Backend: JAX={JAX_IS_ENABLED()} (QD_USE_JAX={int(USE_JAX)}) platform={PLAT} backend={JAX_BACKEND()}")
     if JAX_IS_ENABLED() and JAX_BACKEND() in ("cpu", "metal"):
         print("[Benchmark][Note] JAX backend is cpu/metal; this path is usually slower than pure NumPy for this problem size.")
@@ -83,7 +112,7 @@ def run_benchmark(nlat: int, nlon: int, steps: int, dt: float, with_ocean: bool)
     alpha_ice = 0.6
     alpha_cloud = 0.5
 
-    # Warm-up few steps (helps JIT compilation on JAX)
+    tracemalloc.start()
     warmup = min(2, max(0, steps // 10))
     if warmup > 0:
         for _ in range(warmup):
@@ -112,7 +141,8 @@ def run_benchmark(nlat: int, nlon: int, steps: int, dt: float, with_ocean: bool)
                 SH_arr, _ = energy.boundary_layer_fluxes(gcm.T_s, T_a, gcm.u, gcm.v, land_mask, C_H=C_H, rho=rho_air, c_p=cp_air, B_land=B_land, B_ocean=B_ocean)
                 LH_arr = getattr(gcm, "LH_last", 0.0)
                 if np.isscalar(LH_arr):
-                    LH_arr = np.full_like(gcm.T_s, float(LH_arr))
+                    scalar_lh = np.asarray(LH_arr).item()
+                    LH_arr = np.full_like(gcm.T_s, float(scalar_lh))
                 Q_net = SW_sfc - LW_sfc - SH_arr - LH_arr
                 ocean.step(dt, gcm.u, gcm.v, Q_net=Q_net, ice_mask=(gcm.h_ice > 0.0))
                 ocean_open = (land_mask == 0) & (gcm.h_ice <= 0.0)
@@ -149,7 +179,8 @@ def run_benchmark(nlat: int, nlon: int, steps: int, dt: float, with_ocean: bool)
             SH_arr, _ = energy.boundary_layer_fluxes(gcm.T_s, T_a, gcm.u, gcm.v, land_mask, C_H=C_H, rho=rho_air, c_p=cp_air, B_land=B_land, B_ocean=B_ocean)
             LH_arr = getattr(gcm, "LH_last", 0.0)
             if np.isscalar(LH_arr):
-                LH_arr = np.full_like(gcm.T_s, float(LH_arr))
+                scalar_lh = np.asarray(LH_arr).item()
+                LH_arr = np.full_like(gcm.T_s, float(scalar_lh))
             Q_net = SW_sfc - LW_sfc - SH_arr - LH_arr
             ocean.step(dt, gcm.u, gcm.v, Q_net=Q_net, ice_mask=(gcm.h_ice > 0.0))
             ocean_open = (land_mask == 0) & (gcm.h_ice <= 0.0)
@@ -159,7 +190,39 @@ def run_benchmark(nlat: int, nlon: int, steps: int, dt: float, with_ocean: bool)
     t1 = time.perf_counter()
 
     per_step = (t1 - t0) / max(1, steps)
-    print(f"[Benchmark] Total wall time: {t1 - t0:.3f} s | per-step: {per_step:.6f} s | sim_days={sim_time / (2*np.pi/constants.PLANET_OMEGA):.3f}")
+    mem_peak_mb = _memory_peak_mb()
+    tracemalloc.stop()
+    result: dict[str, Any] = {
+        "schema_version": 1,
+        "backend": {
+            "jax_enabled": bool(JAX_IS_ENABLED()),
+            "qd_use_jax": bool(USE_JAX),
+            "qd_jax_platform": str(PLAT),
+            "jax_backend": str(JAX_BACKEND()),
+        },
+        "config": {
+            "nlat": int(nlat),
+            "nlon": int(nlon),
+            "steps": int(steps),
+            "dt_seconds": float(dt),
+            "with_ocean": bool(with_ocean),
+            "warmup_steps": int(warmup),
+        },
+        "metrics": {
+            "total_wall_seconds": float(t1 - t0),
+            "per_step_seconds": float(per_step),
+            "sim_days": float(sim_time / (2 * np.pi / constants.PLANET_OMEGA)),
+            "memory_peak_mb": float(mem_peak_mb),
+        },
+    }
+    metrics: dict[str, Any] = result["metrics"]
+    print(
+        f"[Benchmark] Total wall time: {float(metrics['total_wall_seconds']):.3f} s | "
+        f"per-step: {float(metrics['per_step_seconds']):.6f} s | "
+        f"sim_days={float(metrics['sim_days']):.3f} | "
+        f"memory_peak={float(metrics['memory_peak_mb']):.2f} MB"
+    )
+    return result
 
 
 def main():
@@ -169,11 +232,16 @@ def main():
     ap.add_argument("--steps", type=int, default=50)
     ap.add_argument("--dt", type=float, default=300.0)
     ap.add_argument("--with-ocean", action="store_true", default=False)
+    ap.add_argument("--output-json", type=str, default="")
     args = ap.parse_args()
 
     # Print header
     print("=== Qingdai GCM JAX Benchmark (P016 M1) ===")
-    run_benchmark(args.nlat, args.nlon, args.steps, args.dt, args.with_ocean)
+    result = run_benchmark(args.nlat, args.nlon, args.steps, args.dt, args.with_ocean)
+    if str(args.output_json).strip():
+        with open(str(args.output_json).strip(), "w", encoding="utf-8") as fp:
+            json.dump(result, fp, ensure_ascii=False, indent=2)
+        print(f"[Benchmark] Wrote JSON: {args.output_json}")
 
 
 if __name__ == "__main__":

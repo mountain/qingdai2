@@ -1,5 +1,4 @@
 import numpy as np
-
 from pygcm.numerics.double_buffer import DoubleBufferingArray as DBA
 
 
@@ -33,6 +32,7 @@ def test_self_aliasing_write_raises():
 
 def test_debug_readonly_flag():
     import os
+
     old = os.getenv("QD_DBA_DEBUG_READONLY")
     os.environ["QD_DBA_DEBUG_READONLY"] = "1"
     try:

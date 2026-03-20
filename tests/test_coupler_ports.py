@@ -1,5 +1,4 @@
 import numpy as np
-
 from pygcm.energy import EnergyParams
 from pygcm.humidity import HumidityParams
 from pygcm.world.coupler import Coupler
