@@ -470,6 +470,7 @@ class QingdaiWorld:
 - 2026‑03‑21：v1.24 推进 Phase 4 第六批：新增 `WorldDiagnosticsDocument` 等 dataclass contract 与 `world_diagnostics_from_dict/make_world_diagnostics_document`，引入严格字段校验与可选 backward-compat 解析策略。
 - 2026‑03‑21：v1.25 完成 Phase 4 收口并切换 Phase 5：补齐 Phase 4 验收清单并将项目状态更新为“Phase 5 启动中”。
 - 2026‑03‑21：v1.26 完成 Phase 5 收口：完善 JAX 运行策略（`QD_JAX_ALLOW_CPU`）、增强 `benchmark_jax.py` 的内存峰值与 JSON 输出，并补齐 Phase5 回归测试与文档同步。
+- 2026‑03‑21：v1.27 第二阶段 Legacy 清理：`scripts/run_simulation.py` 切换为 OO-only 入口并物理删除不可达 legacy 主循环大段实现，同步 README 与最小回归。
 
 ---
 

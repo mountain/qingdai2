@@ -117,7 +117,7 @@
 10. 快速自旋与重启（P013）：[docs/11-spin-up-and-restarts.md](./docs/11-spin-up-and-restarts.md)（详见 [projects/013](./projects/013-spin-up.md)）
 11. 开发者指南/代码架构与 API（P002 + 实现）：[docs/12-code-architecture-and-apis.md](./docs/12-code-architecture-and-apis.md)（参见 [projects/002](./projects/002-physics-core.md)）
 12. 地表水文与径流路由（P014）：[projects/014-surface-hydrology.md](./projects/014-surface-hydrology.md)（运行参数见 [docs/04-runtime-config.md](./docs/04-runtime-config.md) 第 10 节）
-13. 项目状态与进展对齐（2025‑09‑26）：[docs/STATUS-2025-09-26.md](./docs/STATUS-2025-09-26.md)
+13. 项目状态与进展（P020/P021/P016）：[projects/020](./projects/020-oo-refactor.md)、[projects/021](./projects/021-double-buffering.md)、[projects/016](./projects/016-jax-acceleration.md)
 14. 地形递减率与雪线/雪被（P019）：[docs/18-orography-lapse-and-snowpack.md](./docs/18-orography-lapse-and-snowpack.md)（设计与任务见 [projects/019](./projects/019-orography-lapse-and-snowpack.md)）
 
 ## 🤝 贡献
@@ -130,7 +130,7 @@
 
 ---
 
-## 👩‍💻 开发者指引（OO Phase 1+）
+## 👩‍💻 开发者指引（P020/P021 已收口）
 
 本节面向开发者，介绍本地开发环境、质量检查与测试流程，以及 P020/P021 的 OO 路径与回归入口。
 
@@ -156,7 +156,7 @@
 
 ### 2) 质量检查与测试（本地）
 
-当前 Phase 0 仅对 `pygcm/world` 与 `tests` 目录执行格式/静态/类型检查（后续阶段将逐步扩大覆盖面）：
+当前默认对 `pygcm/world` 与 `tests` 目录执行格式/静态/类型检查（与现有 CI 配置保持一致）：
 
 ```bash
 # 代码风格（不修改代码）
@@ -183,17 +183,15 @@ pytest -q
 - 步骤顺序：`ruff check` → `black --check` → `mypy` → `pytest`
 - 同样仅针对 `pygcm/world` 与 `tests` 范围做静态与类型检查
 
-### 4) P020/P021：OO 运行开关与 M4 回归
+### 4) P020/P021：收口状态与运行入口
 
-当前 `pygcm/world` 已支持最小 OO 世界编排（Atmos/Ocean/Hydrology/Ecology）：
-- 启用 OO（默认随后仍进入 legacy 主循环）：
+当前 `pygcm/world` 已完成 OO 世界编排主链路（Atmos/Ocean/Hydrology/Routing/Ecology）：
+- 运行 OO 主模拟：
   ```bash
-  export QD_USE_OO=1
   python3 -m scripts.run_simulation
   ```
-- 严格 OO（仅运行 OO 世界并退出 legacy）：
+- 严格 OO smoke（仅运行 1 步，用于快速链路验证）：
   ```bash
-  export QD_USE_OO=1
   export QD_USE_OO_STRICT=1
   python3 -m scripts.run_simulation
   ```
@@ -206,14 +204,14 @@ pytest -q
 ```bash
 UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv run --with pytest --with scipy pytest -q
 ```
-P020 Phase 0→Phase 5 已完成：当前支持 OO 编排链路与 JAX 可选后端，并提供 `scripts/benchmark_jax.py` 的步时/内存峰值/JSON 基准输出。
+P020 与 P021 已完成既定阶段收口：当前支持 OO 编排链路、统一 world diagnostics、JAX 可选后端，以及 `scripts/benchmark_jax.py` 的步时/内存峰值/JSON 基准输出。
 
 ### 5) 测试策略与范围
 
-- Phase 0：已提供基础用例与 `scripts/test_orbital_module.py` 的 pytest 迁移版
+- 基础回归：已提供核心 smoke/契约用例与 `scripts/test_orbital_module.py` 的 pytest 迁移版
   - `tests/test_phase0_basics.py`
   - `tests/test_orbital_module.py`
-- 生态 autosave 的测试迁移将在 Phase 1 引入“契约级测试”（不锁死文件格式细节，以便重构）
+- 生态 autosave 等模块继续采用“契约级测试”策略（不锁死文件格式细节，便于后续演进）
 - 若需添加更多测试，建议优先选择“物理/数学不变量、契约接口”类型用例，避免对实现细节形成过早约束
 
 ### 6) 贡献与协作

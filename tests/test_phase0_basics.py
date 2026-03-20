@@ -5,7 +5,7 @@ Covers:
 - world façade basics (creation, env-driven config, step() clock advance)
 - orbital module basic invariants and a t=0 flux check against constants
 - jax_compat availability and boolean API
-- scripts.run_simulation OO strict short-circuit (QD_USE_OO=1, QD_USE_OO_STRICT=1)
+- scripts.run_simulation OO strict short-circuit (QD_USE_OO_STRICT=1)
 """
 
 import importlib
@@ -90,14 +90,10 @@ def test_jax_compat_is_enabled_boolean():
 
 def test_run_simulation_oo_strict_short_circuit(capsys, monkeypatch):
     """
-    Ensure main() returns quickly when QD_USE_OO=1 and QD_USE_OO_STRICT=1,
-    exercising the Phase 0 switch without executing the legacy engine.
+    Ensure main() returns quickly when QD_USE_OO_STRICT=1.
     """
     # Set switches
-    monkeypatch.setenv("QD_USE_OO", "1")
     monkeypatch.setenv("QD_USE_OO_STRICT", "1")
-    # Keep plots disabled just in case
-    monkeypatch.setenv("QD_PLOT_EVERY_DAYS", "1000000")
 
     # Import the module and run main
     mod = importlib.import_module("scripts.run_simulation")
