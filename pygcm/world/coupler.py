@@ -60,7 +60,13 @@ class CouplerParams:
 
 
 class Coupler:
-    def __init__(self, params: CouplerParams | None = None) -> None:
+    def __init__(
+        self,
+        params: CouplerParams | None = None,
+        *,
+        energy_params=None,
+        humidity_params=None,
+    ) -> None:
         self.params = params or CouplerParams()
 
         # Try import optional modules
@@ -80,9 +86,37 @@ class Coupler:
                 self._humidity = _humidity
             except Exception:
                 self._humidity = None
+        self._energy_params = energy_params
+        self._humidity_params = humidity_params
+        if self._energy is not None and self._energy_params is None:
+            try:
+                self._energy_params = self._energy.EnergyParams()
+            except Exception:
+                self._energy_params = None
+        if self._humidity is not None and self._humidity_params is None:
+            try:
+                self._humidity_params = self._humidity.HumidityParams()
+            except Exception:
+                self._humidity_params = None
 
         # Constants
         self.LV = float(getattr(constants, "LV", 2.5e6))
+        try:
+            if self._humidity_params is not None and hasattr(self._humidity_params, "L_v"):
+                self.LV = float(getattr(self._humidity_params, "L_v"))
+        except Exception:
+            pass
+
+    def set_external_params(self, *, energy_params=None, humidity_params=None) -> None:
+        if energy_params is not None:
+            self._energy_params = energy_params
+        if humidity_params is not None:
+            self._humidity_params = humidity_params
+            try:
+                if hasattr(humidity_params, "L_v"):
+                    self.LV = float(getattr(humidity_params, "L_v"))
+            except Exception:
+                pass
 
     def compute(
         self,
@@ -131,16 +165,28 @@ class Coupler:
         # Use humidity module for evaporation if possible
         if self._humidity is not None and column_in is not None:
             try:
-                # In a full model, we would need near-surface wind |V| and a surface factor
-                # (ocean/land/ice). For demo, use |V| ≈ 1 m/s proxy and surface_factor=1.
-                V10 = xp.ones_like(T_s)  # proxy
                 q = xp.array(column_in.q, copy=False)
-                E = self._humidity.evaporation_flux(  # kg m^-2 s^-1
+                hp = self._humidity_params
+                if hp is None:
+                    hp = self._humidity.HumidityParams()
+                if column_in.u10 is not None:
+                    u10 = xp.array(column_in.u10, copy=False)
+                else:
+                    u10 = xp.ones_like(T_s)
+                if column_in.v10 is not None:
+                    v10 = xp.array(column_in.v10, copy=False)
+                else:
+                    v10 = xp.zeros_like(T_s)
+                sf = self._humidity.surface_evaporation_factor(
+                    surface_in.land_mask, surface_in.ice_mask, hp
+                )
+                E = self._humidity.evaporation_flux(
                     T_s=T_s,
                     q=q,
-                    Vmag=V10,
-                    surface_factor=xp.ones_like(T_s),
-                    params=getattr(self._humidity, "HumidityParams", object)(),  # default params
+                    u=u10,
+                    v=v10,
+                    surface_factor=sf,
+                    params=hp,
                 )
                 evap_flux = E
                 LH = self.LV * E  # W m^-2, positive upward from surface
@@ -157,12 +203,39 @@ class Coupler:
         else:
             SH = xp.zeros_like(T_s)
 
-        # Shortwave/Longwave via energy module if available (placeholders otherwise)
-        if self._energy is not None and surface_in.base_albedo is not None:
+        # Shortwave/Longwave via energy module
+        if (
+            self._energy is not None
+            and surface_in.base_albedo is not None
+            and surface_in.insolation is not None
+            and column_in is not None
+        ):
             try:
-                # Without incident I and cloud we cannot compute SW properly; keep placeholders.
-                SW_sfc = xp.zeros_like(T_s)
-                LW_sfc = xp.zeros_like(T_s)
+                ep = self._energy_params
+                if ep is None:
+                    ep = self._energy.EnergyParams()
+                cloud_eff = xp.clip(xp.array(column_in.cloud, copy=False), 0.0, 1.0)
+                _SW_atm, SW_sfc, _R = self._energy.shortwave_radiation(
+                    xp.array(surface_in.insolation, copy=False),
+                    xp.array(surface_in.base_albedo, copy=False),
+                    cloud_eff,
+                    ep,
+                )
+                if column_in.Ta is not None:
+                    Ta = xp.array(column_in.Ta, copy=False)
+                else:
+                    Ta = xp.array(T_s, copy=False)
+                eps_sfc = self._energy.surface_emissivity_map(
+                    surface_in.land_mask,
+                    xp.where(surface_in.ice_mask is None, 0.0, surface_in.ice_mask),
+                )
+                _LW_atm, LW_sfc, _OLR, _DLR, _eps = self._energy.longwave_radiation_v2(
+                    xp.array(T_s, copy=False),
+                    Ta,
+                    cloud_eff,
+                    eps_sfc,
+                    ep,
+                )
             except Exception:
                 SW_sfc = xp.zeros_like(T_s)
                 LW_sfc = xp.zeros_like(T_s)

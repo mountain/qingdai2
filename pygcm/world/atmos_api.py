@@ -102,5 +102,9 @@ def make_coupler(kind: str = "default", **kwargs: Any) -> AtmosCoupler:
         from .coupler import Coupler, CouplerParams
 
         params = kwargs.get("params") or CouplerParams()
-        return Coupler(params)
+        return Coupler(
+            params,
+            energy_params=kwargs.get("energy_params"),
+            humidity_params=kwargs.get("humidity_params"),
+        )
     raise ValueError(f"Unknown AtmosCoupler kind: {kind!r}")

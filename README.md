@@ -130,9 +130,9 @@
 
 ---
 
-## 👩‍💻 开发者指引（Phase 0）
+## 👩‍💻 开发者指引（OO Phase 1+）
 
-本节面向开发者，介绍本地开发环境、质量检查与测试流程，以及 P020 Phase 0 的 OO 骨架开关。
+本节面向开发者，介绍本地开发环境、质量检查与测试流程，以及 P020/P021 的 OO 路径与回归入口。
 
 ### 1) 环境与安装
 
@@ -183,22 +183,30 @@ pytest -q
 - 步骤顺序：`ruff check` → `black --check` → `mypy` → `pytest`
 - 同样仅针对 `pygcm/world` 与 `tests` 范围做静态与类型检查
 
-### 4) P020 Phase 0：OO 骨架与开关
+### 4) P020/P021：OO 运行开关与 M4 回归
 
-Phase 0 提供最小 OO 骨架（`pygcm/world`），默认保持 legacy 路径不变：
-- 激活 façade（仍运行 legacy 引擎）：
+当前 `pygcm/world` 已支持最小 OO 世界编排（Atmos/Ocean/Hydrology/Ecology）：
+- 启用 OO（默认随后仍进入 legacy 主循环）：
   ```bash
   export QD_USE_OO=1
   python3 -m scripts.run_simulation
   ```
-- 仅运行 façade 桩函数（跳过 legacy）：
+- 严格 OO（仅运行 OO 世界并退出 legacy）：
   ```bash
   export QD_USE_OO=1
   export QD_USE_OO_STRICT=1
   python3 -m scripts.run_simulation
   ```
+- 生成 P021 M4 回归+基准报告（输出 `projects/p021-m4-results.json`）：
+  ```bash
+  python3 -m scripts.p021_m4_regression_and_benchmark
+  ```
 
-后续 Phase 1–5 将逐步将模块迁移进 OO 世界对象（参数对象化、纯函数化 forcing/physics、JAX 优先、生态/水文等子系统契约化）。
+如果使用 uv 且网络较慢，可使用清华镜像：
+```bash
+UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv run --with pytest --with scipy pytest -q
+```
+后续将继续推进 P020 Phase 2/3（配置参数固化、子系统深度内收、统一编排契约）。
 
 ### 5) 测试策略与范围
 

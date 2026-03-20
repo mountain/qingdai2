@@ -80,7 +80,17 @@ class DoubleBufferingArray:
     @property
     def read(self):
         """Array representing the current readable buffer."""
-        return self._a if self._read_idx == 0 else self._b
+        arr = self._a if self._read_idx == 0 else self._b
+        try:
+            import os as _os
+            if int(_os.getenv("QD_DBA_DEBUG_READONLY", "0")) == 1:
+                try:
+                    arr.flags.writeable = False
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return arr
 
     @property
     def write(self):

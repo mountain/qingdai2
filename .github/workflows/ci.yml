@@ -68,3 +68,35 @@ jobs:
       - name: Run tests
         run: |
           pytest -q
+
+  p021-m4-report:
+    name: P021 M4 Report (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Generate P021 M4 report
+        env:
+          P021_M4_OO_DAYS: "1.0"
+          P021_M4_BENCH_DAYS: "0.05"
+        run: |
+          python -m scripts.p021_m4_regression_and_benchmark
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: p021-m4-results
+          path: projects/p021-m4-results.json

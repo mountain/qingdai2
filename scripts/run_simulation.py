@@ -1168,7 +1168,7 @@ def main():
     except Exception:
         pass
 
-    # P020 Phase 0 switch (non-intrusive): when QD_USE_OO=1, instantiate façade and run stub.
+    # P020/P021 OO switch: when QD_USE_OO=1, run QingdaiWorld orchestrator path.
     # Legacy path continues unless QD_USE_OO_STRICT=1.
     try:
         USE_OO = int(os.getenv("QD_USE_OO", "0")) == 1
@@ -1179,13 +1179,12 @@ def main():
         if QingdaiWorld is not None:
             try:
                 world = QingdaiWorld.create_default()
-                print("[P020] QD_USE_OO=1 → QingdaiWorld façade active (Phase 0).")
-                # Phase 0 stub (does not alter legacy behavior)
+                print("[P020] QD_USE_OO=1 → QingdaiWorld OO orchestrator active (Phase 1+).")
                 world.run()
             except Exception as _wo:
-                print(f"[P020] world façade run stub raised: {_wo}")
+                print(f"[P020] world OO run raised: {_wo}")
             if OO_STRICT:
-                print("[P020] QD_USE_OO_STRICT=1 → exiting legacy engine after façade run.")
+                print("[P020] QD_USE_OO_STRICT=1 → exiting legacy engine after OO run.")
                 return
         else:
             print("[P020] QD_USE_OO=1 but pygcm.world is unavailable; continuing with legacy engine.")

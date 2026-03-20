@@ -1,6 +1,6 @@
 # 项目 P020（修订版 v1.2）：架构重构（面向对象 + 可测试 + 渐进迁移）
 
-状态：提案→可落地设计（2025‑09‑27）  
+状态：Phase 0→Phase 4 已完成，Phase 5 启动中（2026‑03‑21）  
 作者：Cline（AI 软件工程师）  
 修订：v1.2 合入评审建议（Pydantic 校验 / 依赖注入 / Façade API 合约 / JAX‑First 设计）  
 关联文档与代码：
@@ -263,27 +263,55 @@ class QingdaiWorld:
 
 ## 7. 迁移阶段（Milestones）
 
-- 阶段 0（façade 注入，1–2 天）
+- 阶段 0（façade 注入，完成）
   - 新增 `pygcm/world/*`（config/params/state/world）骨架；
   - `QingdaiWorld` 内部直接调用旧脚本逻辑（adapter 直连 scripts.run_simulation 的函数块或现有类）；
   - 新增 `QD_USE_OO=1` 开关，默认关闭；冒烟测试通过。
 
-- 阶段 1（配置/参数/状态固化，2–3 天）
-  - 实装 `SimConfig/ParamsRegistry/WorldState`，由环境变量解析（Pydantic 校验）；
-  - 旧模块读 env → 改读 world.config/params（通过适配）；
-  - 输出元数据与 schema_version 注入 restart。
+- 阶段 1（最小世界编排可运行，完成）
+  - 接入 `QingdaiWorld.run()` 最小编排，使用 `world.state` 与 `Atmosphere` orchestrator 驱动一步；
+  - 构建网格与基础地形、摩擦与热容量图；热力强迫计算 `Teq` 并推进；
+  - 保持 `QD_USE_OO` 门控，`QD_USE_OO_STRICT=1` 时可严格走 OO 路径；
+  - 已接入 `Hydrology`/`Ecology` 到 OO 世界步进：降水相态分配、SWE/桶模型更新、生态子步反照率反馈、日步 soil-index 更新；
+  - 已补齐 Coupler 端口最小集（insolation/u10/v10）并在 world 编排中传递。
 
-- 阶段 2（Forcing/Physics 纯函数化，2–4 天）
+- 阶段 2（Forcing/Physics 纯函数化，完成）
   - 将短波/长波/BL/Teq/反照率组合器从过程调用改为纯函数模块（保留原逻辑，JAX‑First 编写）；
   - Atmosphere/Surface/Ocean 改为仅组织调用 + 写入 state。
+  - 已完成首批配置固化：`SimConfig` 增加正值校验（网格与步长）与 `snapshot()`，`create_default()` 输出配置快照用于运行追踪。
+  - 已补齐参数注册首批固化：`ParamsRegistry.from_env()` 与 `PhysicsParams/SpectralBands/EcologyParams` 校验及快照；运行可选输出 metadata JSON（`QD_OO_METADATA_JSON`）。
+  - 已开始参数驱动替换 legacy 读取：OO `run()` 优先使用 `self.params.physics/ecology` 驱动 MLD、热容、湿度初值、BL 参数、Bowen 比与诊断频率，减少直接 `os.getenv` 读取。
+  - 本批继续推进到湿度/水文注入层：OO 路径直接构造 `HumidityParams/HydrologyParams` 并注入，`snowpack_step` 改为使用参数对象中的 `snow_albedo_fresh`，进一步降低子模块内部 env 耦合。
+  - 本批继续推进到 Coupler 闭环：`Coupler` 支持 `energy_params/humidity_params` 显式注入并提供 `set_external_params()`；默认参数改为类默认值（不再经 env getter），OO world 侧统一注入参数对象。
+  - 本批继续推进到运行控制闭环：`world.run()` 对总时长与 metadata 开关不再直接读取 env，统一由 `SimConfig` 字段（`total_years/sim_days/oo_metadata_json/oo_config_diag`）驱动。
+  - 本批继续推进运行控制收口：`SimConfig` 新增 `oo_metadata_enable/default_orbit_fraction`，metadata 写出与默认仿真时长完全由配置对象控制。
+  - 本批继续收紧配置边界：`SimConfig.snapshot` 改为 `domain/runtime_control` 分组 schema，`ParamsRegistry.snapshot` 改为 `parameter_groups` 分组 schema，并补齐 roundtrip 序列化一致性测试。
 
 - 阶段 3（Atmosphere/Ocean 子系统内收，4–7 天）
   - 将 dynamics/ocean 的 time_step/step 逻辑迁入类方法；numerics 保持独立；
   - 保持 façcade 兼容；步时与闭合逐步回归。
+  - 已启动首批：新增 `world/ocean_orchestrator.py`，将海洋推进与状态写回从 `world.run()` 主循环中内收为可注入 orchestrator。
+  - 本批继续推进：移除 `world.run()` 中 ocean fallback 分支，统一收敛到 orchestrator 接口（`configure + step_and_write`），并提供 legacy backend 自动包装兼容。
+  - 本批继续推进 Atmosphere 同级收敛：新增 `world/atmos_orchestrator.py`，`world.run()` 大气路径统一为 orchestrator 接口（`configure + step_and_write`），并提供 legacy `time_step` 自动包装兼容。
+  - 本批继续推进 Phase 3 收口：将 Atmos/Ocean `configure` 参数统一收敛为单一 `WorldOrchestratorConfigureSpec` 对象，`world.run()` 不再分散拼装两套参数。
+  - 本批完成 Phase 3 最后一段收口：新增 spec builder（`build_world_orchestrator_spec`），将 `orchestrator_spec` 组装逻辑下沉并进一步瘦身 `world.run()`。
 
 - 阶段 4（Hydrology/Routing/Ecology 对齐，5–8 天）
   - P009/P019 算子拆分；Routing 收束为类 API；Ecology 用 Adapter 对接 world 时序；
   - 日界/子步的调度固化到 world。
+  - 已启动首批：新增 `RoutingOrchestrator` 并接入 `world.run()`，支持 injected/legacy routing 统一适配。
+  - 本批继续推进：新增 `HydrologyOrchestrator` 并接入 `world.run()`，固定执行顺序为 `hydrology → routing → ecology`。
+  - 本批继续推进：新增 `EcologyOrchestrator` 并内收生态调度，形成统一三段编排链路（`hydrology → routing → ecology`）。
+  - 本批继续推进：聚合 routing/hydrology/ecology diagnostics 为统一 `world_diagnostics` 输出结构，替代分散步内打印并降低后处理耦合。
+  - 本批继续推进：`world_diagnostics` 增加可选 JSON 落盘与 schema 版本化校验，降低后处理耦合并稳定跨版本消费。
+  - 本批继续推进：将 `world_diagnostics` schema 抽象为独立 typed contract（dataclass），并增加严格字段校验与可选向后兼容策略。
+  - Phase 4 验收清单（收口）：
+    - [x] Routing/Hydrology/Ecology 全部纳入 orchestrator 链路，支持 injected/legacy 适配
+    - [x] 固定顺序编排稳定：`hydrology → routing → ecology`（含顺序回归）
+    - [x] `world.run()` 去散落式子系统调用，形成统一编排入口
+    - [x] 聚合诊断统一为 `world_diagnostics`，覆盖 energy/water + hydrology/routing/ecology
+    - [x] `world_diagnostics` 支持 schema 校验、typed contract、可选 JSON 落盘与 backward-compat 解析
+    - [x] 分批回归 + M4 回归持续通过（稳定指标未退化）
 
 - 阶段 5（JAX 互操作 + 性能与基准，5–7 天）
   - 与 projects/016 的 `xp` 后端对齐；核心算子加 `@jit`；
@@ -410,6 +438,29 @@ class QingdaiWorld:
 
 - 2025‑09‑27：v1.2 合入评审建议：Pydantic 校验、DI 依赖注入、Façade 即 API 合约、JAX‑First 强化；补充不可变状态策略与 Mock 测试用例建议。
 - 2025‑09‑27：v1.1 可落地蓝图：对象模型、API 合约、迁移阶段、测试矩阵、持久化 schema、性能策略与骨架代码；对齐 docs/12/04/06/07/08/09/10/11/14/15/16/18。
+- 2025‑11‑22：v1.3 启动 Phase 1 最小世界编排：`QingdaiWorld.run()` 使用 `world.state` + `Atmosphere`（legacy_spectral 引擎）推进，读取 env 构建地形、热容量与 `Teq`，在 `QD_USE_OO` 开启时可运行最小 OO 路径。
+- 2025‑11‑22：v1.4 扩展 Phase 1：OO 世界接入 Hydrology/Ecology 调度（SWE/桶更新与生态反照率反馈）、Coupler 端口扩展（insolation/u10/v10）并完成严格模式短程回归。
+- 2026‑03‑20：v1.5 推进 Phase 2 首批：`SimConfig` 新增校验与 `snapshot()`，OO 初始化打印配置快照（`QD_OO_CONFIG_DIAG`），并补充配置校验单测。
+- 2026‑03‑20：v1.6 推进 Phase 2 第二批：`ParamsRegistry.from_env()` 与参数校验/快照落地，`QingdaiWorld.run()` 输出 schema 化 `run_metadata` 并支持写入 `QD_OO_METADATA_JSON`。
+- 2026‑03‑20：v1.7 推进 Phase 2 第三批：OO 主循环将 MLD/热容/湿度初值/边界层与生态耦合开关等配置改由 `ParamsRegistry` 驱动，新增参数与 metadata 回归测试。
+- 2026‑03‑20：v1.8 推进 Phase 2 第四批：OO 路径将湿度/水文参数改为构造后注入（`HumidityParams/HydrologyParams`），并移除 `snowpack_step` 对 env 的直接读取，补充注入回归测试。
+- 2026‑03‑20：v1.9 推进 Phase 2 第五批：`coupler.py` 去除 env getter 默认路径，改为 world 显式注入 `energy/humidity` 参数；新增注入回归测试并完成分批回归。
+- 2026‑03‑20：v1.10 推进 Phase 2 第六批：`SimConfig` 扩展运行控制字段并接管 `world.run()` 剩余运行期 env 读取（总时长与 metadata 输出），补充配置映射与路径稳定性回归测试。
+- 2026‑03‑20：v1.11 推进 Phase 2 第七批：`SimConfig` 新增 metadata enable 与默认轨道分数策略，`world.run()` 运行控制逻辑全部由配置对象闭环驱动，新增默认时长与开关回归测试。
+- 2026‑03‑20：v1.12 推进 Phase 2 第八批：明确 `SimConfig/ParamsRegistry` schema 分组边界并新增 `from_snapshot`，补齐配置与参数的 roundtrip 序列化一致性测试。
+- 2026‑03‑21：v1.13 完成 Phase 2 收口：新增 `world/world_step_ops.py` 纯函数流水线并重构 `world.run()` 为薄编排（读-调-写-swap）；补充 `tests/test_world_step_ops.py` 并完成分批回归。
+- 2026‑03‑21：v1.14 启动 Phase 3 首批：新增 `OceanOrchestrator` 并接入 `world.run()`（支持 DI 注入），补充注入编排回归测试。
+- 2026‑03‑21：v1.15 推进 Phase 3 第二批：`world.run()` 海洋路径统一为 orchestrator 接口并移除 fallback；新增 legacy ocean backend 自动包装回归测试。
+- 2026‑03‑21：v1.16 推进 Phase 3 第三批：新增 `AtmosphereOrchestrator`，`world.run()` 大气路径统一为 orchestrator 接口并移除 fallback；新增 injected/legacy atmosphere 回归测试。
+- 2026‑03‑21：v1.17 推进 Phase 3 第四批：新增 `orchestrator_spec.py` 并以 `WorldOrchestratorConfigureSpec` 统一 Atmos/Ocean configure 输入，减少 `world.run()` 参数拼装噪音并保持回归稳定。
+- 2026‑03‑21：v1.18 完成 Phase 3 收口：新增 `build_world_orchestrator_spec` 下沉 spec 组装逻辑并补充 `tests/test_orchestrator_spec.py`，进一步瘦身 `world.run()`。
+- 2026‑03‑21：v1.19 启动 Phase 4 首批：新增 `RoutingOrchestrator`，将 routing 纳入 world 编排并统一 injected/legacy 兼容；`SimConfig` 增加 routing 运行配置字段并补齐回归测试。
+- 2026‑03‑21：v1.20 推进 Phase 4 第二批：新增 `HydrologyOrchestrator` 并将 hydrology 从 `world_step_ops` 内收；`world.run()` 固定 `hydrology → routing → ecology` 顺序，新增 injected/legacy hydrology 回归测试。
+- 2026‑03‑21：v1.21 推进 Phase 4 第三批：新增 `EcologyOrchestrator` 并内收生态子步/日界调度；`world.run()` 形成 hydrology/routing/ecology 统一 orchestrator 链路并补齐 injected/legacy ecology 回归测试。
+- 2026‑03‑21：v1.22 推进 Phase 4 第四批：新增统一 `world_diagnostics` 结构并汇总 energy/water + hydrology/routing/ecology 诊断，补齐统一诊断输出回归测试。
+- 2026‑03‑21：v1.23 推进 Phase 4 第五批：为 `world_diagnostics` 增加 schema 版本化校验与可选 JSON 落盘（`QD_OO_WORLD_DIAG_*`），补齐诊断 schema/落盘回归测试。
+- 2026‑03‑21：v1.24 推进 Phase 4 第六批：新增 `WorldDiagnosticsDocument` 等 dataclass contract 与 `world_diagnostics_from_dict/make_world_diagnostics_document`，引入严格字段校验与可选 backward-compat 解析策略。
+- 2026‑03‑21：v1.25 完成 Phase 4 收口并切换 Phase 5：补齐 Phase 4 验收清单并将项目状态更新为“Phase 5 启动中”。
 
 ---
 

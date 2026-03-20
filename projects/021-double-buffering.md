@@ -1,12 +1,12 @@
 # Project 021：双缓冲状态引擎（Double Buffering State Engine）
 
-状态（2025‑09‑27）
+状态（2026‑03‑20）
 - [x] 方案定稿（本文件）
-- [ ] M1：核心抽象 DoubleBufferingArray 与单元测试
-- [ ] M2：NumPy/JAX 后端验证与基准测试（前置）＋ WorldState 双缓冲化与子系统读/写契约改造
-- [ ] M3：与 P020（OO 重构）集成，按步原子切换
-- [ ] M4：回归与验收（守恒、不回归、性能）
-- [ ] M5：文档与示例更新
+- [x] M1：核心抽象 DoubleBufferingArray（已在 `pygcm/numerics/double_buffer.py`）
+- [x] M2：`WorldState` 双缓冲化（已在 `pygcm/world/state.py`）与 orchestrator 读/写契约（已在 `pygcm/world/atmosphere.py`）
+- [x] M3：与 P020 集成扩展（`QingdaiWorld.run()` 以 DBA 串联 Atmos/Ocean/Hydrology/Ecology 最小步进）
+- [x] M4：长期守恒阈值回归与 legacy 对比基准已补齐
+- [x] M5：文档与示例更新（测试与基准、CI）
 
 交叉引用
 - 架构与 API：docs/12-code-architecture-and-apis.md
@@ -348,6 +348,53 @@ CI 与回归
 ## 11. 变更记录（Changelog）
 
 - 2025‑09‑27：v1 方案定稿：定义 DBA 抽象、WorldState 双缓冲化、子系统读/写契约、NumPy/JAX 互操作策略、基准与验收标准。
+- 2025‑11‑22：v1.1：DBA 与 WorldState 在 world/orchestrator 生效；`QingdaiWorld.run()` 使用 DBA 推进最小一步，进入与 P020 的最小集成阶段。
+- 2025‑11‑22：v1.2：Coupler 端口扩展（insolation/u10/v10）、`.read` 调试只读保护、`tests/test_coupler_ports.py` 与 `tests/test_oo_world_integration.py` 回归补齐，OO 严格模式可完成短程运行。
+- 2026‑03‑20：v1.3：补齐 M4 剩余项。新增 `tests/test_p021_m4_regression.py` 长程守恒阈值回归；新增 `scripts/p021_m4_regression_and_benchmark.py` 输出 `projects/p021-m4-results.json`，完成 OO 与 legacy 运行基准对比。
+- 2026‑03‑20：v1.4：完成 M5。更新 README 的 OO/M4 操作示例，CI 新增手动 `p021-m4-report` 任务（生成并上传 `p021-m4-results.json`），并补齐 `tests/test_world_config.py` 以支撑 P020/P021 集成配置回归。
+- 2026‑03‑20：v1.5：补强集成回归覆盖，新增 `tests/test_world_params.py` 与 `tests/test_oo_metadata.py`，验证参数注册校验与 metadata 产出，巩固 P021 在 P020 Phase 2 期间的稳定性。
+- 2026‑03‑20：v1.6：配合 P020 Phase 2 参数驱动替换，新增参数字段覆盖并回归验证 `ParamsRegistry`→OO 主循环链路，确保 DBA 编排在参数化改造中保持稳定。
+- 2026‑03‑20：v1.7：配合 P020 第四批注入改造，新增 `tests/test_hydrology_param_injection.py`，验证 hydrology 核心步骤不再依赖 env 直接读取并保持 DBA 链路稳定。
+- 2026‑03‑20：v1.8：`Coupler` 改为显式参数注入优先（energy/humidity），去除 env getter 默认耦合；新增 `test_coupler_explicit_param_injection` 并通过分批回归。
+- 2026‑03‑20：v1.9：配合 P020 运行控制闭环改造，新增 `SimConfig` 运行时字段映射与 metadata 路径稳定性回归测试，确保 DBA 编排不受运行期 env 变更影响。
+- 2026‑03‑20：v1.10：配合 P020 第七批收口，新增 metadata enable 与默认时长策略回归（`test_world_respects_metadata_enable_switch`、`test_world_run_uses_default_orbit_fraction`），确保运行控制参数化后 DBA 稳定。
+- 2026‑03‑20：v1.11：配合 P020 第八批边界收紧，新增配置/参数 schema 分组与 roundtrip 序列化一致性测试，确保 DBA 元数据与参数对象长期可演进。
+- 2026‑03‑21：v1.12：配合 P020 Phase 2 收口，新增 `world/world_step_ops.py` 纯函数流水线与 `tests/test_world_step_ops.py`，`world.run()` 重构为薄编排后仍保持 DBA 回归稳定。
+- 2026‑03‑21：v1.13：配合 P020 Phase 3 首批，新增海洋 orchestrator 注入链路回归（`test_world_run_uses_injected_ocean_orchestrator`），确保 DBA 与 DI 并行稳定。
+- 2026‑03‑21：v1.14：配合 P020 Phase 3 第二批，移除海洋 fallback 分支并统一 orchestrator 接口，新增 legacy backend 自动包装回归（`test_world_run_wraps_legacy_ocean_backend`）。
+- 2026‑03‑21：v1.15：配合 P020 Phase 3 第三批，大气路径统一 orchestrator 接口并新增 injected/legacy atmosphere 回归（`test_world_run_uses_injected_atmos_orchestrator`、`test_world_run_wraps_legacy_atmos_backend`）。
+- 2026‑03‑21：v1.16：配合 P020 Phase 3 第四批，引入 `WorldOrchestratorConfigureSpec` 统一 Atmos/Ocean configure 输入，回归验证 DI 注入链路在统一 spec 下保持稳定。
+- 2026‑03‑21：v1.17：配合 P020 Phase 3 收口，引入 `build_world_orchestrator_spec` 下沉 spec 组装并新增 `test_orchestrator_spec.py`，保持 DBA/DI 回归稳定。
+- 2026‑03‑21：v1.18：配合 P020 Phase 4 首批，routing 接入 world orchestrator 链路并新增 injected/legacy routing 回归，保持 DBA 与多子系统 DI 兼容稳定。
+- 2026‑03‑21：v1.19：配合 P020 Phase 4 第二批，hydrology 接入 world orchestrator 链路并固定 `hydrology→routing→ecology` 顺序，新增 injected/legacy hydrology 回归，保持 DBA 编排稳定。
+- 2026‑03‑21：v1.20：配合 P020 Phase 4 第三批，ecology 接入 world orchestrator 链路并内收日界/子步调度，新增 injected/legacy ecology 回归并保持 DBA 稳定。
+- 2026‑03‑21：v1.21：配合 P020 Phase 4 第四批，新增统一 `world_diagnostics` 聚合输出并覆盖 hydrology/routing/ecology 诊断字段，回归验证 DBA 编排与诊断结构稳定。
+- 2026‑03‑21：v1.22：配合 P020 Phase 4 第五批，`world_diagnostics` 新增 schema 校验与可选 JSON 落盘，确保 DBA 诊断输出可稳定被后处理脚本消费。
+- 2026‑03‑21：v1.23：配合 P020 Phase 4 第六批，`world_diagnostics` 引入 dataclass typed contract、严格字段校验与可选 backward-compat 解析，回归验证输出结构稳定。
+- 2026‑03‑21：v1.24：配合 P020 Phase 4 收口，确认 DBA 链路验收清单完成并进入 Phase 5（JAX 互操作 + 性能基准）阶段。
+
+## 12. M4 实测结果（2026‑03‑20）
+
+- 执行命令：
+  - `python3 -m scripts.p021_m4_regression_and_benchmark`
+  - `UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv run --with pytest --with scipy pytest -q tests/test_p021_m4_regression.py tests/test_coupler_ports.py tests/test_double_buffering.py`
+- OO 长程回归配置：`QD_N_LAT=32`，`QD_N_LON=64`，`QD_DT_SECONDS=300`，`days=5.0`
+- 阈值：
+  - `|TOA_net|_mean_abs <= 90.0 W/m²`
+  - `|SFC_net|_mean_abs <= 450.0 W/m²`
+  - `|ATM_net|_mean_abs <= 350.0 W/m²`
+  - `|water_closure_residual|_mean_abs <= 1e-8 kg m^-2 s^-1`
+- 实测：
+  - `energy_mean_abs_toa = 64.8167 W/m²`
+  - `energy_mean_abs_sfc = 366.5535 W/m²`
+  - `energy_mean_abs_atm = 301.7367 W/m²`
+  - `water_mean_abs_residual = 4.1703e-18 kg m^-2 s^-1`
+  - 回归结果：`PASS`
+- legacy 对比基准（CLI，`QD_SIM_DAYS=0.5`）：
+  - OO 严格模式：`0.7133 s`（`returncode=0`）
+  - legacy 路径：`282.1229 s`（`returncode=0`）
+  - 比值：`legacy_over_oo_ratio = 395.53`
+- 结果文件：`projects/p021-m4-results.json`
 
 ---
 

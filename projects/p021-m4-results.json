@@ -1,0 +1,61 @@
+{
+  "oo_regression": {
+    "energy_mean_abs_toa": 67.5488505589714,
+    "energy_mean_abs_sfc": 368.4532096977771,
+    "energy_mean_abs_atm": 300.9043591388058,
+    "water_mean_abs_residual": 3.8095577132426174e-18,
+    "steps": 48,
+    "elapsed_seconds": 0.29256666701985523,
+    "days": 0.2
+  },
+  "oo_thresholds": {
+    "energy_mean_abs_toa": 90.0,
+    "energy_mean_abs_sfc": 450.0,
+    "energy_mean_abs_atm": 350.0,
+    "water_mean_abs_residual": 1e-08
+  },
+  "oo_regression_pass": true,
+  "benchmark": {
+    "oo": {
+      "mode": "oo",
+      "returncode": 0,
+      "elapsed_seconds": 0.36944362497888505,
+      "tail": [
+        "[JAX] Acceleration enabled: False (toggle via QD_USE_JAX=1; platform via QD_JAX_PLATFORM=cpu|gpu|tpu)",
+        "[P020] SimConfig snapshot: {'schema_version': 1, 'domain': {'grid': {'n_lat': 32, 'n_lon': 64}, 'subsystems': {'use_ocean': True, 'use_ecology': False, 'use_routing': True}, 'time_step': {'dt_seconds': 300.0}}, 'runtime_control': {'oo_config_diag': True, 'oo_metadata_enable': True, 'oo_metadata_json': '', 'total_years': None, 'sim_days': 0.02, 'default_orbit_fraction': 0.02, 'routing_netcdf': 'data/hydrology.nc', 'routing_dt_hydro_hours': 6.0, 'routing_treat_lake_as_water': True, 'routing_alpha_lake': None, 'routing_diag': True, 'world_diagnostics_enable': True, 'world_diagnostics_json': '', 'world_diagnostics_schema_version': 1, 'world_diagnostics_strict_validation': True, 'world_diagnostics_allow_backward_compat': False}}",
+        "[P020] Params snapshot: {'schema_version': 1, 'parameter_groups': {'physics': {'gh_factor': 0.582, 'ce': 0.0013, 'lv': 2500000.0, 'rho_w': 1000.0, 'cp_w': 4200.0, 'mld_m': 50.0, 'cs_land': 3000000.0, 'cs_ice': 5000000.0, 'q_init_rh': 0.5, 'ch': 0.0015, 'cp_a': 1004.0, 'bowen_land': 0.7, 'bowen_ocean': 0.3, 'oo_diag_every': 1000000, 'rho_a': 1.2, 'h_mbl': 800.0, 'p0': 100000.0, 'tau_cond': 1800.0, 'ocean_evap_scale': 1.0, 'land_evap_scale': 0.5, 'ice_evap_scale': 0.05, 'runoff_tau_days': 10.0, 'wland_cap_mm': None, 'snow_thresh_k': 273.15, 'snow_melt_rate_mm_day': 5.0, 'snow_t_band_k': 1.5, 'snow_melt_mode': 'degree_day', 'snow_ddf_mm_per_k_day': 3.0, 'snow_melt_tref_k': 273.15, 'swe_ref_mm': 15.0, 'swe_max_mm': None, 'snow_albedo_fresh': 0.7, 'water_diag': False, 'sw_a0': 0.06, 'sw_kc': 0.2, 'lw_eps0': 0.7, 'lw_kc': 0.2, 't_floor': 150.0, 'c_sfc': 20000000.0, 'energy_diag': False}, 'bands': {'nbands': 16}, 'ecology': {'lai_albedo_weight': 1.0, 'feedback_mode': 'instant', 'soil_water_cap': 50.0, 'albedo_couple': True}}}",
+        "[P020] QD_USE_OO=1 → QingdaiWorld OO orchestrator active (Phase 1+).",
+        "[Topography] Target land fraction=0.290, achieved=0.290, sea_level=2202.8 m",
+        "[P021-DIAG] steps=4 | energy_mean_abs TOA=64.961 SFC=365.828 ATM=300.868 | water_residual=2.861e-18",
+        "[P020] OO world completed 4 step(s) | max|u|=0.00 m/s | max|v|=0.00 m/s | max|h|=0.00",
+        "[P020] QD_USE_OO_STRICT=1 → exiting legacy engine after OO run."
+      ],
+      "stderr_tail": []
+    },
+    "legacy": {
+      "mode": "legacy",
+      "returncode": 0,
+      "elapsed_seconds": 11.235474792018067,
+      "tail": [
+        "Final state diagnostics:",
+        "  Max absolute zonal wind (u): 133.67 m/s",
+        "  Max absolute meridional wind (v): 3.81 m/s",
+        "  Max absolute height anomaly (h): 8218.0 m",
+        "[Autosave] NetCDF save failed: No module named 'netCDF4'",
+        "[Ocean] Save failed: No module named 'netCDF4'",
+        "[Phyto] Bio/optics JSON written: 'data/plankton.json' (S=10, NB=16)",
+        "[Phyto] save_distribution_nc failed: No module named 'netCDF4'"
+      ],
+      "stderr_tail": [
+        "  0%|          | 0/5 [00:00<?, ?it/s]",
+        " 20%|██        | 1/5 [00:02<00:08,  2.23s/it]",
+        " 40%|████      | 2/5 [00:04<00:06,  2.19s/it]",
+        " 60%|██████    | 3/5 [00:06<00:04,  2.12s/it]",
+        " 80%|████████  | 4/5 [00:08<00:02,  2.13s/it]",
+        "100%|██████████| 5/5 [00:10<00:00,  2.18s/it]",
+        "100%|██████████| 5/5 [00:10<00:00,  2.17s/it]"
+      ]
+    },
+    "legacy_over_oo_ratio": 30.41187892377413
+  }
+}

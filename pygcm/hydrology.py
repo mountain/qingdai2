@@ -42,6 +42,7 @@ class HydrologyParams:
     swe_enable: bool = True  # enable snowpack reservoir (SWE)
     swe_ref_mm: float = 15.0  # mm; reference SWE for optical coverage C_snow
     swe_max_mm: float | None = None  # optional cap for SWE (mm)
+    snow_albedo_fresh: float = 0.70
     diag: bool = True  # enable diagnostics printing
 
 
@@ -82,6 +83,7 @@ def get_hydrology_params_from_env() -> HydrologyParams:
         swe_enable=(_i("QD_SWE_ENABLE", 1) == 1),
         swe_ref_mm=_f("QD_SWE_REF_MM", 15.0),
         swe_max_mm=swe_max_mm,
+        snow_albedo_fresh=_f("QD_SNOW_ALBEDO_FRESH", 0.70),
         diag=(_i("QD_WATER_DIAG", 1) == 1),
     )
 
@@ -179,10 +181,7 @@ def snowpack_step(
     C_snow = np.clip(C_snow, 0.0, 1.0)
 
     # Simple snow albedo map (fresh snow value; aging not tracked here)
-    try:
-        alpha_snow_val = float(os.getenv("QD_SNOW_ALBEDO_FRESH", "0.70"))
-    except Exception:
-        alpha_snow_val = 0.70
+    alpha_snow_val = float(params.snow_albedo_fresh)
     alpha_snow_map = np.full_like(S_next, alpha_snow_val, dtype=float)
 
     return (

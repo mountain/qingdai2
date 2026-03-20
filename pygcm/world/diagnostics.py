@@ -31,6 +31,63 @@ except Exception:
 from pygcm import constants
 
 
+WORLD_DIAGNOSTICS_SCHEMA_VERSION = 1
+
+
+@dataclass(frozen=True)
+class WorldDiagnosticsSummary:
+    energy_mean_abs_toa: float
+    energy_mean_abs_sfc: float
+    energy_mean_abs_atm: float
+    water_mean_abs_residual: float
+
+    def to_dict(self) -> dict[str, float]:
+        return {
+            "energy_mean_abs_toa": float(self.energy_mean_abs_toa),
+            "energy_mean_abs_sfc": float(self.energy_mean_abs_sfc),
+            "energy_mean_abs_atm": float(self.energy_mean_abs_atm),
+            "water_mean_abs_residual": float(self.water_mean_abs_residual),
+        }
+
+
+@dataclass(frozen=True)
+class WorldDiagnosticsStep:
+    step: int
+    energy: dict[str, float]
+    water: dict[str, float]
+    hydrology: dict[str, Any]
+    routing: dict[str, Any]
+    ecology: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "step": int(self.step),
+            "energy": dict(self.energy),
+            "water": dict(self.water),
+            "hydrology": dict(self.hydrology),
+            "routing": dict(self.routing),
+            "ecology": dict(self.ecology),
+        }
+
+
+@dataclass(frozen=True)
+class WorldDiagnosticsDocument:
+    schema_version: int
+    steps: int
+    summary: WorldDiagnosticsSummary
+    last_step: WorldDiagnosticsStep
+    samples: list[WorldDiagnosticsStep]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": int(self.schema_version),
+            "steps": int(self.steps),
+            "summary": self.summary.to_dict(),
+            "last_step": self.last_step.to_dict(),
+            "samples": [s.to_dict() for s in self.samples],
+        }
+
+
 def _as_array(x: Any):
     """
     Accept either a DBA-like object with .read or a plain ndarray, and return a plain array.
@@ -198,6 +255,174 @@ def diagnostics_report(prev: Invariants, nxt: Invariants) -> dict[str, float]:
         "pe_new": nxt.pe,
         **d,
     }
+
+
+def _strict_keys(value: dict[str, Any], required: set[str], *, strict: bool, field: str) -> None:
+    keys = set(value.keys())
+    missing = required - keys
+    if missing:
+        raise ValueError(f"{field} missing required keys")
+    if strict and keys != required:
+        raise ValueError(f"{field} has unexpected keys")
+
+
+def _coerce_step(
+    raw: dict[str, Any],
+    *,
+    strict: bool,
+    allow_backward_compat: bool,
+    fallback_step: int,
+) -> WorldDiagnosticsStep:
+    if not isinstance(raw, dict):
+        raise ValueError("world_diagnostics step entry must be a dict")
+    required = {"step", "energy", "water", "hydrology", "routing", "ecology"}
+    if allow_backward_compat:
+        step = int(raw.get("step", fallback_step))
+        energy = dict(raw.get("energy", {}))
+        water = dict(raw.get("water", {}))
+        hydrology = dict(raw.get("hydrology", {}))
+        routing = dict(raw.get("routing", {}))
+        ecology = dict(raw.get("ecology", {}))
+    else:
+        _strict_keys(raw, required, strict=strict, field="world_diagnostics.last_step")
+        step = int(raw["step"])
+        energy = dict(raw["energy"])
+        water = dict(raw["water"])
+        hydrology = dict(raw["hydrology"])
+        routing = dict(raw["routing"])
+        ecology = dict(raw["ecology"])
+    return WorldDiagnosticsStep(
+        step=step,
+        energy=energy,
+        water=water,
+        hydrology=hydrology,
+        routing=routing,
+        ecology=ecology,
+    )
+
+
+def world_diagnostics_from_dict(
+    doc: dict[str, Any],
+    *,
+    expected_schema_version: int = WORLD_DIAGNOSTICS_SCHEMA_VERSION,
+    strict: bool = True,
+    allow_backward_compat: bool = False,
+) -> WorldDiagnosticsDocument:
+    if not isinstance(doc, dict):
+        raise ValueError("world_diagnostics must be a dict")
+    top_required = {"schema_version", "steps", "summary", "last_step", "samples"}
+    if allow_backward_compat:
+        schema_version = int(doc.get("schema_version", expected_schema_version))
+        if schema_version > int(expected_schema_version):
+            raise ValueError("world_diagnostics schema_version is newer than expected")
+        steps = int(doc.get("steps", 0))
+        summary_raw = dict(doc.get("summary", {}))
+        last_step_raw = doc.get("last_step", {})
+        samples_raw = list(doc.get("samples", []))
+    else:
+        _strict_keys(doc, top_required, strict=strict, field="world_diagnostics")
+        schema_version = int(doc["schema_version"])
+        steps = int(doc["steps"])
+        summary_raw = dict(doc["summary"])
+        last_step_raw = doc["last_step"]
+        samples_raw = list(doc["samples"])
+    if schema_version != int(expected_schema_version):
+        if not allow_backward_compat:
+            raise ValueError("world_diagnostics schema_version mismatch")
+    summary_required = {
+        "energy_mean_abs_toa",
+        "energy_mean_abs_sfc",
+        "energy_mean_abs_atm",
+        "water_mean_abs_residual",
+    }
+    if allow_backward_compat:
+        summary = WorldDiagnosticsSummary(
+            energy_mean_abs_toa=float(summary_raw.get("energy_mean_abs_toa", 0.0)),
+            energy_mean_abs_sfc=float(summary_raw.get("energy_mean_abs_sfc", 0.0)),
+            energy_mean_abs_atm=float(summary_raw.get("energy_mean_abs_atm", 0.0)),
+            water_mean_abs_residual=float(summary_raw.get("water_mean_abs_residual", 0.0)),
+        )
+    else:
+        _strict_keys(
+            summary_raw,
+            summary_required,
+            strict=strict,
+            field="world_diagnostics.summary",
+        )
+        summary = WorldDiagnosticsSummary(
+            energy_mean_abs_toa=float(summary_raw["energy_mean_abs_toa"]),
+            energy_mean_abs_sfc=float(summary_raw["energy_mean_abs_sfc"]),
+            energy_mean_abs_atm=float(summary_raw["energy_mean_abs_atm"]),
+            water_mean_abs_residual=float(summary_raw["water_mean_abs_residual"]),
+        )
+    samples = [
+        _coerce_step(
+            s if isinstance(s, dict) else {},
+            strict=strict,
+            allow_backward_compat=allow_backward_compat,
+            fallback_step=i + 1,
+        )
+        for i, s in enumerate(samples_raw)
+    ]
+    last_step = _coerce_step(
+        last_step_raw if isinstance(last_step_raw, dict) else {},
+        strict=strict,
+        allow_backward_compat=allow_backward_compat,
+        fallback_step=(steps if steps > 0 else len(samples)),
+    )
+    return WorldDiagnosticsDocument(
+        schema_version=int(expected_schema_version),
+        steps=int(steps),
+        summary=summary,
+        last_step=last_step,
+        samples=samples,
+    )
+
+
+def make_world_diagnostics_document(
+    *,
+    schema_version: int,
+    steps: int,
+    summary: dict[str, Any],
+    last_step: dict[str, Any],
+    samples: list[dict[str, Any]],
+    strict: bool = True,
+    allow_backward_compat: bool = False,
+) -> WorldDiagnosticsDocument:
+    raw = {
+        "schema_version": int(schema_version),
+        "steps": int(steps),
+        "summary": dict(summary),
+        "last_step": dict(last_step),
+        "samples": list(samples),
+    }
+    return world_diagnostics_from_dict(
+        raw,
+        expected_schema_version=int(schema_version),
+        strict=bool(strict),
+        allow_backward_compat=bool(allow_backward_compat),
+    )
+
+
+def world_diagnostics_to_jsonable(obj: Any) -> Any:
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, dict):
+        return {str(k): world_diagnostics_to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [world_diagnostics_to_jsonable(v) for v in obj]
+    return obj
+
+
+def validate_world_diagnostics(doc: dict[str, Any], expected_schema_version: int = 1) -> None:
+    world_diagnostics_from_dict(
+        doc,
+        expected_schema_version=int(expected_schema_version),
+        strict=True,
+        allow_backward_compat=False,
+    )
 
 
 # Example usage pattern (to be used by orchestrators or the world driver):

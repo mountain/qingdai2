@@ -65,6 +65,7 @@ class SurfaceToAtmosphere:
     ice_mask: np.ndarray | None = None  # {0,1}
     base_albedo: np.ndarray | None = None  # scalar or map before cloud/eco/ice
     friction_map: np.ndarray | None = None  # s^-1 or a roughness proxy
+    insolation: np.ndarray | None = None  # incoming shortwave at TOA/surface driver (W m^-2)
 
 
 # ------------------------------
@@ -95,6 +96,8 @@ class ColumnProcessIn:
     precip_rate: np.ndarray  # kg m^-2 s^-1
     Ta: np.ndarray | None = None  # air temp proxy (K)
     RH: np.ndarray | None = None  # relative humidity [0,1]
+    u10: np.ndarray | None = None  # near-surface zonal wind (m/s)
+    v10: np.ndarray | None = None  # near-surface meridional wind (m/s)
 
 
 @dataclass
